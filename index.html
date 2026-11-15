@@ -224,6 +224,25 @@
   .themes button.on{background:var(--tc);color:var(--ti);font-weight:500;box-shadow:inset 0 0 0 1.5px var(--ti)}
   .themes button:active{transform:scale(.95)}
 
+  /* ---------- filter bar: tag dropdown + theme chips ---------- */
+  .fbar{display:flex;align-items:center;gap:8px}
+  .dd{position:relative;flex:none}
+  .dd-btn{display:inline-flex;align-items:center;gap:6px;padding:9px 12px 9px 15px;border-radius:999px;background:var(--chip);font-size:15px;color:var(--ink)}
+  .dd-btn .n{color:var(--mute);font-size:12px;font-variant-numeric:tabular-nums}
+  .dd-btn .car{font-style:normal;font-size:10px;color:#666;transition:transform .25s var(--ease);margin-left:1px}
+  .dd.open .car{transform:rotate(180deg)}
+  .dd-menu{position:absolute;top:calc(100% + 8px);left:0;min-width:200px;max-height:60vh;overflow-y:auto;background:#fff;border-radius:18px;padding:6px;z-index:6;
+    box-shadow:0 18px 44px rgba(0,0,0,.14);opacity:0;transform:translateY(-8px) scale(.97);transform-origin:20px 0;pointer-events:none;transition:opacity .2s,transform .25s var(--ease)}
+  .dd.open .dd-menu{opacity:1;transform:none;pointer-events:auto}
+  .dd-menu button{display:flex;width:100%;justify-content:space-between;align-items:center;gap:16px;padding:11px 12px;border-radius:12px;font-size:15px;text-align:left}
+  .dd-menu button.on{background:var(--chip);font-weight:500}
+  .dd-menu .n{color:var(--soft);font-size:12px;font-variant-numeric:tabular-nums}
+  .tchips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;flex:1;min-width:0;margin-right:-18px;padding:2px 18px 2px 0}
+  .tchips::-webkit-scrollbar{display:none}
+  .tchip{flex:none;display:inline-flex;align-items:center;gap:5px;padding:8px 12px 8px 10px;border-radius:999px;background:#fff;font-size:13.5px;color:#555;box-shadow:0 1px 4px rgba(0,0,0,.06);transition:background .15s}
+  .tchip.on{background:var(--tc);color:var(--ti);font-weight:500;box-shadow:inset 0 0 0 1.5px var(--ti)}
+  .tchip .n{font-size:11.5px;opacity:.55}
+
   /* ---------- gift reservations (hidden from the wishlist owner) ---------- */
   .card .rsv{position:absolute;left:-6px;top:14px;z-index:2;display:inline-flex;align-items:center;gap:5px;background:var(--ink);color:#fff;
     font-size:11.5px;font-weight:500;padding:5px 10px 5px 8px;border-radius:999px;box-shadow:0 6px 14px rgba(0,0,0,.18);transform:rotate(-6deg);white-space:nowrap}
@@ -518,7 +537,7 @@ const coverR = (x,y) => Math.hypot(Math.max(x, innerWidth-x), Math.max(y, innerH
 async function fallInto(pid, fromEl){
   if(S.anim) return; S.anim = true;
   const c = fromEl ? circleAt(fromEl) : { x:innerWidth/2, y:innerHeight/2, r:30 };
-  S.view = pid; S.cat = "All"; renderList(); renderDock();
+  S.view = pid; S.cat = "All"; S.theme = null; renderList(); renderDock();
   const L = $("list"), H = $("home");
   L.scrollTop = 0; L.classList.remove("anim","shown");
   L.style.clipPath = `circle(${c.r}px at ${c.x}px ${c.y}px)`;
@@ -554,7 +573,7 @@ async function hopTo(pid, fromEl){
   void L.offsetWidth;
   L.classList.add("anim"); L.classList.remove("shown"); L.style.clipPath = `circle(${c.r}px at ${c.x}px ${c.y}px)`;
   await sleep(520);
-  S.view = pid; S.cat = "All"; renderList(); renderDock(); L.scrollTop = 0;
+  S.view = pid; S.cat = "All"; S.theme = null; renderList(); renderDock(); L.scrollTop = 0;
   history.replaceState(null, "", "#" + pid);
   void L.offsetWidth;
   L.classList.add("shown"); L.style.clipPath = `circle(${coverR(c.x,c.y)}px at ${c.x}px ${c.y}px)`;
@@ -574,7 +593,11 @@ function renderList(){
   const free = open.filter(i => !resOf(i));
   if(S.cat === "Available" && !seeGifts) S.cat = "All";
   const chips = [["All",open.length], ...(seeGifts && free.length !== open.length ? [["Available", free.length]] : []), ...cats.map(c=>[c,counts[c]]), ["Completed",done.length]];
-  const list = S.cat==="Completed" ? done : S.cat==="Available" ? free : open.filter(i => S.cat==="All" || (i.category||"Other")===S.cat);
+  const base = S.cat==="Completed" ? done : S.cat==="Available" ? free : open.filter(i => S.cat==="All" || (i.category||"Other")===S.cat);
+  const tcount = {}; base.forEach(i => { if(themeOf(i.theme)) tcount[i.theme] = (tcount[i.theme]||0) + 1; });
+  if(S.theme && !tcount[S.theme]) S.theme = null;
+  const list = S.theme ? base.filter(i => i.theme === S.theme) : base;
+  const curN = (chips.find(([c]) => c === S.cat) || [0, base.length])[1];
   const own = isMine(pid);
   $("l-head").innerHTML = `
     <div class="l-top">
@@ -582,7 +605,13 @@ function renderList(){
       <div class="l-title">${esc(own ? "your wishlist" : displayName(pid) + "'s wishlist")}</div>
       <button class="round" id="share" aria-label="Copy link">↗</button>
     </div>
-    <nav class="chips">${chips.map(([c,n]) => `<button class="chip ${S.cat===c?'on':''}" data-cat="${esc(c)}">${esc(c)}<span class="n">${n}</span></button>`).join("")}</nav>`;
+    <div class="fbar">
+      <div class="dd" id="dd">
+        <button class="dd-btn" id="dd-btn" aria-haspopup="true">${esc(S.cat)}<span class="n">${curN}</span><i class="car">▾</i></button>
+        <div class="dd-menu" role="menu">${chips.map(([c,n]) => `<button class="${S.cat===c?'on':''}" data-cat="${esc(c)}" role="menuitem"><span>${esc(c)}</span><span class="n">${n}</span></button>`).join("")}</div>
+      </div>
+      <nav class="tchips">${THEMES.filter(t => tcount[t.k]).map(t => `<button class="tchip ${S.theme===t.k?'on':''}" data-themef="${t.k}" style="${themeVars(t)}"><span>${t.e}</span>${esc(t.n)}<span class="n">${tcount[t.k]}</span></button>`).join("")}</nav>
+    </div>`;
   // themed islands stacked top to bottom; inside each, a masonry-ish scatter with its own sizes, tilts and "weight"
   const COLW = 230, byTheme = {};
   if(list.length) byTheme[""] = list;
@@ -630,7 +659,7 @@ function renderList(){
       ? `<div class="empty-state"><b>Nothing completed yet</b>Wishes marked as done land here.</div>`
       : `<div class="empty-state"><b>${own ? "Your wishlist is empty" : "Nothing here yet"}</b>${own ? "Tap + to add the first thing." : ""}</div>`);
   LB.setBounds({ minX: islands ? -40 : -10, minY:-10, maxX:Math.max(maxX, 200) + (islands ? 30 : 10), maxY:Math.max(maxY, 200) + 10 });
-  const key = pid + "|" + S.cat + "|" + list.length;
+  const key = pid + "|" + S.cat + "|" + (S.theme||"") + "|" + list.length;
   if(S.listKey !== key){ S.listKey = key; LB.fit(false); }
   $("back").onclick = climbOut;
   $("share").onclick = async () => {
@@ -650,7 +679,10 @@ document.addEventListener("click", e => {
   const p = e.target.closest(".person[data-person]"); if(p){ fallInto(p.dataset.person, p.querySelector(".av")); return; }
   const h = e.target.closest("[data-hop]"); if(h){ hopTo(h.dataset.hop, h.querySelector(".av")); return; }
   if(e.target.closest("[data-home]")){ climbOut(); return; }
+  if(e.target.closest("#dd-btn")){ $("dd").classList.toggle("open"); return; }
+  if($("dd")?.classList.contains("open") && !e.target.closest("#dd")) $("dd").classList.remove("open");
   const c = e.target.closest("[data-cat]"); if(c){ S.cat = c.dataset.cat; renderList(); return; }
+  const tf = e.target.closest("[data-themef]"); if(tf){ S.theme = S.theme === tf.dataset.themef ? null : tf.dataset.themef; renderList(); return; }
   const isl = e.target.closest("[data-island]"); if(isl){ const r = S.islands?.[isl.dataset.island]; if(r) LB.focus(r); return; }
   const it = e.target.closest(".card[data-id]"); if(it){ openDetail(it.dataset.id); }
 });
