@@ -35,25 +35,26 @@
   .h-top{padding:calc(env(safe-area-inset-top) + 18px) 18px 0 22px;display:flex;justify-content:space-between;align-items:center}
   .logo{font-weight:500;font-size:19px;letter-spacing:-.01em}
   .h-sub{font-size:12.5px;color:var(--mute);margin-top:2px;min-height:1em}
-  .orbit{flex:1;display:flex;flex-wrap:wrap;align-content:center;justify-content:center;gap:34px 30px;padding:20px 26px 60px}
-  .person{display:flex;flex-direction:column;align-items:center;gap:12px;animation:bob 6s ease-in-out infinite}
-  .person:nth-child(2n){animation-delay:-3s;margin-top:70px}
-  .person:nth-child(3n){animation-delay:-1.5s}
-  .person .av{width:132px;height:132px;font-size:34px;box-shadow:0 14px 34px rgba(0,0,0,.08);transition:transform .25s var(--ease)}
+  .person .bob{display:flex;flex-direction:column;align-items:center;gap:12px;animation:bob 6s ease-in-out infinite}
+  .person .av{font-size:34px;box-shadow:0 14px 34px rgba(0,0,0,.08);transition:transform .25s var(--ease)}
   .person:active .av{transform:scale(.94)}
   .person .pn{font-size:15px;font-weight:500}
   .person .pc{font-size:12.5px;color:var(--mute);margin-top:-8px}
   .person.setup .av{background:#fff;color:var(--soft);font-size:30px;font-weight:300;border:1.5px dashed #d6d6d6;box-shadow:none}
   .edit-me{position:absolute;right:4px;bottom:4px;width:30px;height:30px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;font-size:13px}
   @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
-  .h-foot{text-align:center;font-size:12px;color:var(--soft);padding:0 20px calc(env(safe-area-inset-bottom) + 22px)}
+  .h-top{position:relative;z-index:3}
+  .h-foot{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 18px);text-align:center;font-size:12px;color:var(--soft);pointer-events:none;z-index:3}
 
   /* ---------- list (the "inside" of a circle) ---------- */
-  #list{position:fixed;inset:0;background:var(--bg);overflow-y:auto;clip-path:circle(0px at 50% 50%);visibility:hidden;z-index:2;-webkit-overflow-scrolling:touch}
+  #list{position:fixed;inset:0;background:var(--bg);overflow:hidden;clip-path:circle(0px at 50% 50%);visibility:hidden;z-index:2;-webkit-overflow-scrolling:touch}
   #list.open{visibility:visible}
   #list.anim{transition:clip-path .75s var(--ease)}
-  .l-inner{max-width:1040px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 16px) 18px calc(env(safe-area-inset-bottom) + 120px);transform-origin:50% 30%;transition:transform .75s var(--ease),opacity .5s ease}
-  #list:not(.shown) .l-inner{transform:scale(.82);opacity:0}
+  .l-head{position:absolute;left:0;right:0;top:0;z-index:3;padding:calc(env(safe-area-inset-top) + 16px) 18px 18px;background:linear-gradient(var(--bg) 72%, rgba(245,245,244,0));transition:transform .75s var(--ease),opacity .5s ease}
+  .l-head > *{max-width:1040px;margin-left:auto;margin-right:auto}
+  #lb{transition:transform .75s var(--ease),opacity .5s ease;transform-origin:50% 40%}
+  #list:not(.shown) .l-head{opacity:0;transform:translateY(-10px)}
+  #list:not(.shown) #lb{transform:scale(.82);opacity:0}
   .l-top{display:grid;grid-template-columns:36px 1fr 36px;align-items:center;margin-bottom:16px}
   .round{width:36px;height:36px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.06)}
   .l-title{text-align:center;font-weight:500;font-size:16px}
@@ -141,13 +142,42 @@
   .err{color:#c0392b;font-size:13px;text-align:center;margin-top:10px;min-height:1em}
   .toast{position:fixed;top:calc(env(safe-area-inset-top) + 14px);left:50%;transform:translate(-50%,-80px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:13px;transition:transform .3s;z-index:20;white-space:nowrap}
   .toast.on{transform:translate(-50%,0)}
-  @media (prefers-reduced-motion: reduce){ .person{animation:none} #list.anim,.l-inner,#home{transition-duration:.01s} }
+  @media (prefers-reduced-motion: reduce){ .bob{animation:none!important} #list.anim,#lb,.l-head,#home{transition-duration:.01s} }
 
   .pick-row{display:flex;gap:14px;overflow-x:auto;padding:4px 2px 2px;justify-content:center;flex-wrap:wrap}
   .pick-person{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12.5px}
   .pick-person .av{width:56px;height:56px;font-size:17px}
   .person.setup .av{background:#fff;color:var(--soft);font-size:30px;font-weight:300;border:1.5px dashed #d6d6d6;box-shadow:none}
   .btn:disabled{opacity:.6}
+
+  /* ---------- infinite boards (pan / pinch / jelly) ---------- */
+  .board{position:absolute;inset:0;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;
+    background-image:radial-gradient(circle,rgba(0,0,0,.07) 1px,transparent 1.2px);background-size:22px 22px}
+  .board.grabbing{cursor:grabbing}
+  .world{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;--jx:0;--jy:0;--jr:0}
+  .board img{-webkit-user-drag:none;user-drag:none;pointer-events:none}
+  .card{position:absolute;padding:0;text-align:left;display:block;
+    transform:translate(calc(var(--jx)*var(--d)*1px),calc(var(--jy)*var(--d)*1px)) rotate(calc(var(--r)*1deg + var(--jr)*var(--d)*1deg));
+    animation:pop .55s cubic-bezier(.2,.9,.25,1.25) both}
+  @keyframes pop{from{opacity:0;scale:.82}}
+  .card .cimg{background:#fff;border-radius:22px;box-shadow:0 12px 30px rgba(0,0,0,.08);display:flex;align-items:center;justify-content:center;overflow:hidden;transition:scale .2s var(--ease)}
+  .card:active .cimg{scale:.97}
+  .card .cimg img{max-width:84%;max-height:84%;object-fit:contain;mix-blend-mode:multiply}
+  .card .cimg.empty{color:var(--soft);font-size:34px;font-weight:300}
+  .card .string{display:block;width:1.5px;height:16px;margin:0 0 0 24px;background:#cfcfcd;transform-origin:top;
+    transform:rotate(calc(var(--jx)*-2deg))}
+  .card .tag{display:inline-flex;flex-direction:column;max-width:100%;background:#fff;border-radius:14px;padding:8px 12px 9px;box-shadow:0 6px 18px rgba(0,0,0,.07);
+    transform:translate(calc(var(--jx)*1.1px),calc(var(--jy)*.8px)) rotate(calc(var(--jr)*-1.4deg));transform-origin:24px -16px}
+  .card .tag b{font-weight:500;font-size:13px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .card .tag span{font-size:11.5px;color:var(--mute);margin-top:2px}
+  .card.done{opacity:.4}
+  .card.done .tag b{text-decoration:line-through;text-decoration-thickness:1px}
+  .person.card{display:flex;flex-direction:column;align-items:center;text-align:center}
+  .zoom-pill{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 42px);z-index:5;background:rgba(255,255,255,.85);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    border-radius:999px;padding:6px 11px;font-size:11.5px;font-variant-numeric:tabular-nums;color:#555;box-shadow:0 4px 14px rgba(0,0,0,.08);transition:opacity .4s}
+  #list .zoom-pill{bottom:calc(env(safe-area-inset-bottom) + 30px)}
+  .zoom-pill.idle{opacity:.55}
+  .board-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:2}
 
   /* ---------- my avatar button + profile screen ---------- */
   .me-btn{width:40px;height:40px;border-radius:50%;padding:0;flex:none;box-shadow:0 2px 10px rgba(0,0,0,.08);transition:transform .2s var(--ease)}
@@ -181,11 +211,18 @@
 
 <section id="home">
   <div class="h-top"><div><div class="logo">magic wish</div><div class="h-sub" id="h-sub"></div></div><button class="me-btn" id="me-btn" aria-label="Your profile"></button></div>
-  <div class="orbit" id="orbit"><div class="empty-state">Loading…</div></div>
-  <div class="h-foot">tap a circle to fall into a wishlist</div>
+  <div class="board" id="hb"><div class="world" id="hw"></div></div>
+  <div class="board-msg" id="hmsg"><div class="empty-state">Loading…</div></div>
+  <div class="zoom-pill idle" id="hz">100%</div>
+  <div class="h-foot">drag to explore · tap a circle to fall in</div>
 </section>
 
-<section id="list"><div class="l-inner" id="l-inner"></div></section>
+<section id="list">
+  <div class="board" id="lb"><div class="world" id="lw"></div></div>
+  <div class="board-msg" id="lmsg"></div>
+  <div class="l-head" id="l-head"></div>
+  <div class="zoom-pill idle" id="lz">100%</div>
+</section>
 
 <div class="dock" id="dock">
   <div class="pill" id="pill"></div>
@@ -232,6 +269,127 @@ function personList(){
   return [...S.people].sort((a,b) => (a.id===S.me?-1:b.id===S.me?1:0) || (a.created_at||"").localeCompare(b.created_at||"")).map(p=>p.id);
 }
 
+
+/* ---------- infinite board: pan with inertia, pinch / wheel zoom, jelly lag ---------- */
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+function rng(seed){ let h = 2166136261; for(const ch of String(seed)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return () => { h += 0x6D2B79F5; let t = h; t = Math.imul(t ^ t>>>15, t|1); t ^= t + Math.imul(t ^ t>>>7, t|61); return ((t ^ t>>>14) >>> 0) / 4294967296; }; }
+class Board{
+  constructor(vp, world, pill, opts = {}){
+    Object.assign(this, { vp, w:world, pill, x:0, y:0, z:1, vx:0, vy:0, sx:0, sy:0, ptrs:new Map(), drag:false, raf:0,
+      minZ:.3, maxZ:2.6, top:opts.top || 0, bottom:opts.bottom || 0, fitMax:opts.fitMax || 1, colW:opts.colW || 0,
+      b:{ minX:0, minY:0, maxX:0, maxY:0 } });
+    vp.addEventListener("pointerdown", e => this.down(e));
+    vp.addEventListener("pointermove", e => this.move(e));
+    ["pointerup","pointercancel"].forEach(t => vp.addEventListener(t, e => this.up(e)));
+    vp.addEventListener("click", e => { if(this.suppress){ e.stopPropagation(); e.preventDefault(); this.suppress = false; } }, true);
+    vp.addEventListener("wheel", e => this.wheel(e), { passive:false });
+    vp.addEventListener("gesturestart", e => e.preventDefault());
+    if(pill) pill.onclick = () => this.fit(true);
+    addEventListener("resize", () => this.fit(false));
+    this.apply();
+  }
+  get vw(){ return this.vp.clientWidth; } get vh(){ return this.vp.clientHeight; }
+  apply(){
+    this.w.style.transform = `translate3d(${this.x}px,${this.y}px,0) scale(${this.z})`;
+    if(this.pill){ const t = Math.round(this.z*100) + "%"; if(this.pill.textContent !== t) this.pill.textContent = t; }
+  }
+  showPill(){ if(!this.pill) return; this.pill.classList.remove("idle"); clearTimeout(this._pt); this._pt = setTimeout(() => this.pill.classList.add("idle"), 1400); }
+  range(){ // where the world may sit: any content edge can travel to the middle of the screen
+    const b = this.b, z = this.z, vw = this.vw, vh = this.vh;
+    return { x0: vw*.5 - b.maxX*z, x1: vw*.5 - b.minX*z, y0: (this.top + (vh-this.top-this.bottom)*.5) - b.maxY*z, y1: (this.top + (vh-this.top-this.bottom)*.5) - b.minY*z };
+  }
+  local(cx, cy){ const r = this.vp.getBoundingClientRect(); return [cx - r.left, cy - r.top]; }
+  zoomAt(nz, cx, cy){
+    nz = clamp(nz, this.minZ, this.maxZ); const [lx, ly] = this.local(cx, cy);
+    this.x = lx - (lx - this.x) * nz / this.z; this.y = ly - (ly - this.y) * nz / this.z; this.z = nz; this.showPill();
+  }
+  down(e){
+    if(e.button > 0) return;
+    this.ptrs.set(e.pointerId, { x:e.clientX, y:e.clientY }); this.tween = null;
+    if(this.ptrs.size === 1){ this.moved = 0; this.vx = this.vy = 0; this.lastT = performance.now(); }
+    if(this.ptrs.size === 2){ const [a,b] = [...this.ptrs.values()]; this.pinch = { d:Math.hypot(a.x-b.x, a.y-b.y), z:this.z, mx:(a.x+b.x)/2, my:(a.y+b.y)/2 }; this.drag = true; }
+    this.loop();
+  }
+  move(e){
+    const p = this.ptrs.get(e.pointerId); if(!p) return;
+    const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
+    if(this.ptrs.size === 1){
+      this.moved += Math.abs(dx) + Math.abs(dy);
+      if(!this.drag && this.moved > 7){ this.drag = true; this.vp.classList.add("grabbing"); try{ this.vp.setPointerCapture(e.pointerId); }catch(_){} }
+      if(this.drag){
+        const R = this.range(), rx = (this.x < R.x0 || this.x > R.x1) ? .35 : 1, ry = (this.y < R.y0 || this.y > R.y1) ? .35 : 1;
+        this.x += dx*rx; this.y += dy*ry;
+        const now = performance.now(), dt = Math.max(8, now - this.lastT); this.lastT = now;
+        this.vx = this.vx*.4 + (dx/dt*16)*.6; this.vy = this.vy*.4 + (dy/dt*16)*.6;
+      }
+    } else if(this.ptrs.size === 2 && this.pinch){
+      const [a,b] = [...this.ptrs.values()], d = Math.hypot(a.x-b.x, a.y-b.y), mx = (a.x+b.x)/2, my = (a.y+b.y)/2;
+      this.zoomAt(this.pinch.z * d / this.pinch.d, mx, my);
+      this.x += mx - this.pinch.mx; this.y += my - this.pinch.my; this.pinch.mx = mx; this.pinch.my = my;
+      this.vx = this.vy = 0;
+    }
+    this.apply();
+  }
+  up(e){
+    if(!this.ptrs.delete(e.pointerId)) return;
+    if(this.ptrs.size < 2) this.pinch = null;
+    if(this.ptrs.size === 1){ this.lastT = performance.now(); }
+    if(this.ptrs.size === 0){
+      if(this.drag) this.suppress = true;
+      if(performance.now() - this.lastT > 90){ this.vx = this.vy = 0; }
+      this.drag = false; this.vp.classList.remove("grabbing");
+      setTimeout(() => { this.suppress = false; }, 50);
+    }
+    this.loop();
+  }
+  wheel(e){
+    e.preventDefault(); this.tween = null;
+    if(e.ctrlKey || e.metaKey){ this.zoomAt(this.z * Math.exp(-e.deltaY * .01), e.clientX, e.clientY); }
+    else { this.x -= e.deltaX; this.y -= e.deltaY; this.vx = -e.deltaX*.3; this.vy = -e.deltaY*.3; }
+    this.apply(); this.loop();
+  }
+  loop(){ if(!this.raf) this.raf = requestAnimationFrame(() => this.tick()); }
+  tick(){
+    this.raf = 0; let busy = this.ptrs.size > 0;
+    if(this.tween){
+      const t = this.tween, k = clamp((performance.now() - t.t0) / t.ms, 0, 1), e = 1 - Math.pow(1-k, 3);
+      this.x = t.x0 + (t.x1-t.x0)*e; this.y = t.y0 + (t.y1-t.y0)*e; this.z = t.z0 + (t.z1-t.z0)*e;
+      if(k >= 1) this.tween = null; busy = true;
+    } else if(!this.ptrs.size){
+      this.x += this.vx; this.y += this.vy; this.vx *= .93; this.vy *= .93;
+      const R = this.range();
+      if(this.x < R.x0){ this.x += (R.x0 - this.x)*.16; this.vx *= .5; } else if(this.x > R.x1){ this.x += (R.x1 - this.x)*.16; this.vx *= .5; }
+      if(this.y < R.y0){ this.y += (R.y0 - this.y)*.16; this.vy *= .5; } else if(this.y > R.y1){ this.y += (R.y1 - this.y)*.16; this.vy *= .5; }
+      const out = this.x < R.x0-.5 || this.x > R.x1+.5 || this.y < R.y0-.5 || this.y > R.y1+.5;
+      if(Math.abs(this.vx) > .05 || Math.abs(this.vy) > .05 || out) busy = true;
+    } else if(this.drag && performance.now() - this.lastT > 60){ this.vx *= .7; this.vy *= .7; }
+    // jelly: cards trail behind the motion and tilt a little
+    this.sx += (this.vx - this.sx) * .18; this.sy += (this.vy - this.sy) * .18;
+    if(Math.abs(this.sx) > .02 || Math.abs(this.sy) > .02) busy = true;
+    const st = this.w.style;
+    st.setProperty("--jx", clamp(-this.sx*1.1, -26, 26).toFixed(2));
+    st.setProperty("--jy", clamp(-this.sy*1.1, -26, 26).toFixed(2));
+    st.setProperty("--jr", clamp(this.sx*.32, -8, 8).toFixed(2));
+    this.apply();
+    if(busy) this.loop();
+  }
+  setBounds(b){ this.b = b; }
+  fit(animate){
+    const b = this.b, cw = Math.max(1, b.maxX - b.minX), ch = Math.max(1, b.maxY - b.minY);
+    const availW = this.vw - 36, availH = this.vh - this.top - this.bottom - 20;
+    let z = Math.min(availW / (this.colW ? Math.min(cw, this.colW) : cw), this.colW ? Infinity : availH / ch, this.fitMax);
+    z = clamp(z, this.minZ, this.fitMax);
+    const x = (this.vw - cw*z)/2 - b.minX*z;
+    const y = (this.colW && ch*z > availH) ? this.top + 10 - b.minY*z : this.top + (availH - ch*z)/2 - b.minY*z;
+    const tx = this.colW && cw*z > availW ? 18 - b.minX*z : x;
+    if(animate){ this.tween = { t0:performance.now(), ms:520, x0:this.x, y0:this.y, z0:this.z, x1:tx, y1:y, z1:z }; this.loop(); }
+    else { this.x = tx; this.y = y; this.z = z; this.vx = this.vy = 0; this.apply(); }
+    this.showPill();
+  }
+}
+const HB = new Board($("hb"), $("hw"), $("hz"), { top:80, bottom:60, fitMax:1 });
+const LB = new Board($("lb"), $("lw"), $("lz"), { top:118, bottom:90, fitMax:1, colW:470 });
+
 /* ---------- data ---------- */
 async function load(){
   const [p, i] = await Promise.all([
@@ -249,9 +407,9 @@ const scheduleReload = () => { clearTimeout(reloadT); reloadT = setTimeout(() =>
 
 (async () => {
   S.me = lsGet(ME_KEY);
-  const timer = setTimeout(()=>{ if(!S.loaded) $("orbit").innerHTML = `<div class="empty-state"><b>Can't reach the wishlists yet</b>Check your connection.</div>`; }, 10000);
+  const timer = setTimeout(()=>{ if(!S.loaded) $("hmsg").innerHTML = `<div class="empty-state"><b>Can't reach the wishlists yet</b>Check your connection.</div>`; }, 10000);
   try{ await load(); clearTimeout(timer); }
-  catch(e){ clearTimeout(timer); $("orbit").innerHTML = `<div class="empty-state"><b>The wishlists aren't available right now</b>Try again in a moment.</div>`; return; }
+  catch(e){ clearTimeout(timer); $("hmsg").innerHTML = `<div class="empty-state"><b>The wishlists aren't available right now</b>Try again in a moment.</div>`; return; }
   sb.channel("all")
     .on("postgres_changes", { event:"*", schema:"public", table:"items" }, scheduleReload)
     .on("postgres_changes", { event:"*", schema:"public", table:"people" }, scheduleReload)
@@ -271,16 +429,29 @@ function renderHome(){
   const ppl = personList();
   const open = S.items.filter(i=>!i.done).length;
   $("h-sub").textContent = open ? `${open} ${open===1?"wish":"wishes"}` : "";
-  let html = ppl.map(id => {
-    const n = S.items.filter(i=>i.person_id===id && !i.done).length;
-    return `<button class="person" data-person="${esc(id)}">
-      <div class="av">${avatarHTML(id)}</div>
-      <div class="pn">${esc(displayName(id))}${isMine(id) ? " (you)" : ""}</div>
-      <div class="pc">${n ? n + (n===1?" wish":" wishes") : "no wishes yet"}</div>
-    </button>`;
+  const nodes = ppl.map(id => ({ id, join:false }));
+  if(!S.me) nodes.push({ id:"__join", join:true });
+  // sunflower spiral: first circle in the middle, the rest spiralling out
+  let minX=1e9, minY=1e9, maxX=-1e9, maxY=-1e9;
+  const html = nodes.map((nd, i) => {
+    const r = rng(nd.id), size = Math.round(nd.join ? 120 : (i === 0 ? 150 : 118 + r()*30));
+    const ang = i * 2.39996 + .6, rad = i === 0 ? 0 : 168 * Math.sqrt(i) + r()*18;
+    const cx = Math.cos(ang)*rad*1.05, cy = Math.sin(ang)*rad*1.12;
+    const w = Math.max(size, 150), x = Math.round(cx - w/2), y = Math.round(cy - size/2);
+    minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x + w); maxY = Math.max(maxY, y + size + 56);
+    const style = `left:${x}px;top:${y}px;width:${w}px;--d:${(.55 + r()*.9).toFixed(2)};--r:0;animation-delay:${i*60}ms`;
+    const bob = `style="animation-delay:-${(r()*6).toFixed(2)}s"`;
+    if(nd.join) return `<button class="card person setup" data-join="1" style="${style}"><div class="bob" ${bob}><div class="av" style="width:${size}px;height:${size}px">+</div><div class="pn">Join</div><div class="pc">add your circle</div></div></button>`;
+    const n = S.items.filter(it => it.person_id === nd.id && !it.done).length;
+    return `<button class="card person" data-person="${esc(nd.id)}" style="${style}"><div class="bob" ${bob}>
+      <div class="av" style="width:${size}px;height:${size}px;font-size:${Math.round(size/4)}px">${avatarHTML(nd.id)}</div>
+      <div class="pn">${esc(displayName(nd.id))}${isMine(nd.id) ? " (you)" : ""}</div>
+      <div class="pc">${n ? n + (n===1?" wish":" wishes") : "no wishes yet"}</div></div></button>`;
   }).join("");
-  if(!S.me) html += `<button class="person setup" data-join="1"><div class="av">+</div><div class="pn">Join</div><div class="pc">add your circle</div></button>`;
-  $("orbit").innerHTML = html || `<div class="empty-state"><b>No one here yet</b></div>`;
+  $("hw").innerHTML = html;
+  $("hmsg").innerHTML = nodes.length ? "" : `<div class="empty-state"><b>No one here yet</b></div>`;
+  HB.setBounds({ minX:minX-20, minY:minY-10, maxX:maxX+20, maxY:maxY+10 });
+  if(S.homeCount !== nodes.length){ S.homeCount = nodes.length; HB.fit(false); }
   const mb = $("me-btn");
   if(S.me && personById(S.me)){ mb.className = "me-btn"; mb.innerHTML = `<div class="av">${avatarHTML(S.me)}</div>`; }
   else { mb.className = "me-btn join"; mb.textContent = "Join"; }
@@ -348,22 +519,36 @@ function renderList(){
   const chips = [["All",open.length], ...cats.map(c=>[c,counts[c]]), ["Completed",done.length]];
   const list = S.cat==="Completed" ? done : open.filter(i => S.cat==="All" || (i.category||"Other")===S.cat);
   const own = isMine(pid);
-  $("l-inner").innerHTML = `
+  $("l-head").innerHTML = `
     <div class="l-top">
       <button class="round" id="back" aria-label="Back">‹</button>
       <div class="l-title">${esc(own ? "your wishlist" : displayName(pid) + "'s wishlist")}</div>
       <button class="round" id="share" aria-label="Copy link">↗</button>
     </div>
-    <nav class="chips">${chips.map(([c,n]) => `<button class="chip ${S.cat===c?'on':''}" data-cat="${esc(c)}">${esc(c)}<span class="n">${n}</span></button>`).join("")}</nav>
-    ${list.length ? `<div class="grid">${list.map((it,k) => `
-      <button class="item ${it.done?'done':''}" data-id="${esc(it.id)}" style="animation-delay:${200+Math.min(k,12)*35}ms">
-        <div class="ph ${it.image_url?'':'empty'}">${it.image_url ? `<img src="${esc(it.image_url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : esc((it.name||"?")[0].toUpperCase())}</div>
-        <div class="nm">${esc(it.name)}</div>
-        ${it.brand ? `<div class="br">${esc(it.brand)}</div>` : ``}
-      </button>`).join("")}</div>`
-    : S.cat==="Completed"
+    <nav class="chips">${chips.map(([c,n]) => `<button class="chip ${S.cat===c?'on':''}" data-cat="${esc(c)}">${esc(c)}<span class="n">${n}</span></button>`).join("")}</nav>`;
+  // masonry-ish scatter: shortest column first, every card gets its own size, tilt and "weight"
+  const COLW = 230, cols = list.length <= 3 ? Math.max(1, list.length) : list.length <= 8 ? 2 : list.length <= 20 ? 3 : 4;
+  const colY = Array(cols).fill(0).map((_, c) => c % 2 ? 46 : 0);
+  let maxX = 0, maxY = 0;
+  $("lw").innerHTML = list.map((it, k) => {
+    const r = rng(it.id), c = colY.indexOf(Math.min(...colY));
+    const w = Math.round(158 + r()*44), h = Math.round(w * [1, 1.18, .86, 1.08][Math.floor(r()*4)]);
+    const x = Math.round(c*COLW + (COLW - w)/2 + (r()-.5)*30), y = Math.round(colY[c] + (r()-.5)*20);
+    colY[c] = y + h + 110 + r()*34;
+    maxX = Math.max(maxX, x + w); maxY = Math.max(maxY, y + h + 90);
+    const img = it.image_url ? `<img src="${esc(it.image_url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : esc((it.name||"?")[0].toUpperCase());
+    return `<button class="card ${it.done?'done':''}" data-id="${esc(it.id)}" style="left:${x}px;top:${y}px;width:${w}px;--d:${(.5 + r()*1).toFixed(2)};--r:${((r()-.5)*6).toFixed(2)};animation-delay:${120 + Math.min(k,14)*45}ms">
+      <div class="cimg ${it.image_url?'':'empty'}" style="height:${h}px">${img}</div>
+      <i class="string"></i>
+      <div class="tag"><b>${esc(it.name)}</b>${it.brand || it.price ? `<span>${esc([it.brand, it.price].filter(Boolean).join(" · "))}</span>` : ``}</div>
+    </button>`;
+  }).join("");
+  $("lmsg").innerHTML = list.length ? "" : (S.cat==="Completed"
       ? `<div class="empty-state"><b>Nothing completed yet</b>Wishes marked as done land here.</div>`
-      : `<div class="empty-state"><b>${own ? "Your wishlist is empty" : "Nothing here yet"}</b>${own ? "Tap + to add the first thing." : ""}</div>`}`;
+      : `<div class="empty-state"><b>${own ? "Your wishlist is empty" : "Nothing here yet"}</b>${own ? "Tap + to add the first thing." : ""}</div>`);
+  LB.setBounds({ minX:-10, minY:-10, maxX:Math.max(maxX, 200) + 10, maxY:Math.max(maxY, 200) + 10 });
+  const key = pid + "|" + S.cat + "|" + list.length;
+  if(S.listKey !== key){ S.listKey = key; LB.fit(false); }
   $("back").onclick = climbOut;
   $("share").onclick = async () => {
     const url = location.origin + location.pathname + "#" + pid;
@@ -383,7 +568,7 @@ document.addEventListener("click", e => {
   const h = e.target.closest("[data-hop]"); if(h){ hopTo(h.dataset.hop, h.querySelector(".av")); return; }
   if(e.target.closest("[data-home]")){ climbOut(); return; }
   const c = e.target.closest("[data-cat]"); if(c){ S.cat = c.dataset.cat; renderList(); return; }
-  const it = e.target.closest(".item[data-id]"); if(it){ openDetail(it.dataset.id); }
+  const it = e.target.closest(".card[data-id]"); if(it){ openDetail(it.dataset.id); }
 });
 // deep link: …/#<person id> opens that wishlist
 window.addEventListener("load", () => setTimeout(() => {
