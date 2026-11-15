@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f5f5f4">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="akkidellie">
+<title>akkidellie</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f5f5f4; --ink:#111; --mute:#8a8a8a; --soft:#c4c4c4; --chip:#e9e9e8; --line:#e2e2e2;
+    --lime:#e4f77a;
+    --ease:cubic-bezier(.65,0,.2,1);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,sans-serif;font-size:15px;letter-spacing:.005em;overflow:hidden}
+  button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+  input,textarea{font:inherit;color:inherit}
+
+  /* ---------- avatar ---------- */
+  .av{border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--lime);color:#2c3a00;font-weight:500;flex:none;position:relative}
+  .av img{width:100%;height:100%;object-fit:cover;display:block}
+
+  /* ---------- home ---------- */
+  #home{position:fixed;inset:0;display:flex;flex-direction:column;transition:transform .7s var(--ease),opacity .55s var(--ease),filter .6s var(--ease);will-change:transform}
+  #home.away{opacity:0;filter:blur(6px)}
+  .h-top{padding:calc(env(safe-area-inset-top) + 22px) 22px 0;display:flex;justify-content:space-between;align-items:baseline}
+  .logo{font-weight:500;font-size:19px;letter-spacing:-.01em}
+  .h-sub{font-size:13px;color:var(--mute)}
+  .orbit{flex:1;display:flex;flex-wrap:wrap;align-content:center;justify-content:center;gap:34px 30px;padding:20px 26px 60px}
+  .person{display:flex;flex-direction:column;align-items:center;gap:12px;animation:bob 6s ease-in-out infinite}
+  .person:nth-child(2n){animation-delay:-3s;margin-top:70px}
+  .person:nth-child(3n){animation-delay:-1.5s}
+  .person .av{width:132px;height:132px;font-size:34px;box-shadow:0 14px 34px rgba(0,0,0,.08);transition:transform .25s var(--ease)}
+  .person:active .av{transform:scale(.94)}
+  .person .pn{font-size:15px;font-weight:500}
+  .person .pc{font-size:12.5px;color:var(--mute);margin-top:-8px}
+  .person.setup .av{background:#fff;color:var(--soft);font-size:30px;font-weight:300;border:1.5px dashed #d6d6d6;box-shadow:none}
+  .edit-me{position:absolute;right:4px;bottom:4px;width:30px;height:30px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.12);display:flex;align-items:center;justify-content:center;font-size:13px}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+  .h-foot{text-align:center;font-size:12px;color:var(--soft);padding:0 20px calc(env(safe-area-inset-bottom) + 22px)}
+
+  /* ---------- list (the "inside" of a circle) ---------- */
+  #list{position:fixed;inset:0;background:var(--bg);overflow-y:auto;clip-path:circle(0px at 50% 50%);visibility:hidden;z-index:2;-webkit-overflow-scrolling:touch}
+  #list.open{visibility:visible}
+  #list.anim{transition:clip-path .75s var(--ease)}
+  .l-inner{max-width:1040px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 16px) 18px calc(env(safe-area-inset-bottom) + 120px);transform-origin:50% 30%;transition:transform .75s var(--ease),opacity .5s ease}
+  #list:not(.shown) .l-inner{transform:scale(.82);opacity:0}
+  .l-top{display:grid;grid-template-columns:36px 1fr 36px;align-items:center;margin-bottom:16px}
+  .round{width:36px;height:36px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+  .l-title{text-align:center;font-weight:500;font-size:16px}
+
+  .chips{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;margin:0 -18px;padding:0 18px 4px}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{flex:none;padding:9px 14px;border-radius:999px;color:#555;font-size:15px;white-space:nowrap;transition:background .15s}
+  .chip .n{color:var(--soft);font-size:12px;margin-left:5px;font-variant-numeric:tabular-nums}
+  .chip.on{background:var(--chip);color:var(--ink)}
+  .chip.on .n{color:var(--mute)}
+
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:34px 12px;margin-top:28px}
+  @media(min-width:640px){.grid{grid-template-columns:repeat(3,1fr)}}
+  @media(min-width:900px){.grid{grid-template-columns:repeat(4,1fr);gap:56px 20px}}
+  .item{text-align:center;display:flex;flex-direction:column;align-items:center;animation:fade .45s ease both}
+  .item .ph{width:100%;aspect-ratio:1;display:flex;align-items:center;justify-content:center;margin-bottom:14px}
+  .item img{max-width:82%;max-height:82%;object-fit:contain;mix-blend-mode:multiply}
+  .item .ph.empty{color:var(--soft);font-size:28px;font-weight:300}
+  .item .nm{font-size:15px;line-height:1.3;padding:0 4px}
+  .item .br{font-size:13px;color:var(--mute);margin-top:3px}
+  .item.done{opacity:.38}
+  .item.done .nm{text-decoration:line-through;text-decoration-thickness:1px}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}}
+  .empty-state{text-align:center;color:var(--mute);padding:90px 20px;font-size:14px;line-height:1.6}
+  .empty-state b{display:block;color:var(--ink);font-weight:500;font-size:16px;margin-bottom:4px}
+
+  /* bottom bar: avatar pill + add */
+  .dock{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom) + 18px);display:flex;justify-content:space-between;align-items:center;padding:0 18px;z-index:4;pointer-events:none;opacity:0;transform:translateY(20px);transition:opacity .4s ease .25s,transform .5s var(--ease) .25s}
+  .dock.on{opacity:1;transform:none}
+  .dock>*{pointer-events:auto}
+  .pill{display:flex;align-items:center;background:rgba(255,255,255,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-radius:999px;padding:5px;box-shadow:0 6px 22px rgba(0,0,0,.09)}
+  .pill button{margin-left:-12px;border-radius:50%;padding:2px;background:transparent;transition:transform .2s var(--ease)}
+  .pill button:first-child{margin-left:0}
+  .pill .av{width:40px;height:40px;font-size:13px;border:2px solid #fff}
+  .pill button.cur .av{border-color:var(--ink)}
+  .pill button:active{transform:scale(.9)}
+  .pill .home-btn{width:44px;height:44px;margin-left:4px;display:flex;align-items:center;justify-content:center;color:var(--mute)}
+  .add{width:54px;height:54px;border-radius:50%;background:var(--ink);color:#fff;font-size:26px;font-weight:300;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,.16)}
+  .add[hidden]{display:none}
+
+  /* ---------- sheets ---------- */
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.18);opacity:0;pointer-events:none;transition:opacity .25s;z-index:10}
+  .scrim.on{opacity:1;pointer-events:auto}
+  .sheet{position:fixed;left:0;right:0;bottom:0;max-height:92vh;overflow-y:auto;background:var(--bg);border-radius:22px 22px 0 0;transform:translateY(102%);transition:transform .32s cubic-bezier(.2,.8,.2,1);z-index:11;padding:10px 22px calc(env(safe-area-inset-bottom) + 26px)}
+  @media(min-width:640px){.sheet{max-width:460px;margin:0 auto}}
+  .sheet.on{transform:none}
+  .grab{width:36px;height:4px;border-radius:4px;background:#d9d9d9;margin:0 auto 14px}
+  .d-img{aspect-ratio:1.2;display:flex;align-items:center;justify-content:center}
+  .d-img img{max-width:72%;max-height:88%;object-fit:contain;mix-blend-mode:multiply}
+  .d-name{font-size:22px;font-weight:500;text-align:center;margin-top:6px;letter-spacing:-.01em}
+  .d-brand{text-align:center;color:var(--mute);margin-top:4px}
+  .d-price{text-align:center;margin-top:12px;font-variant-numeric:tabular-nums}
+  .d-desc{color:#444;line-height:1.55;margin:22px 0 0;white-space:pre-wrap;font-size:14.5px}
+  .d-meta{color:var(--mute);font-size:12.5px;text-align:center;margin-top:22px}
+  .d-link{display:block;text-align:center;margin-top:22px;padding:14px;border-radius:14px;background:var(--ink);color:#fff;text-decoration:none;font-weight:500;font-size:14px}
+  .row{display:flex;gap:8px;margin-top:10px}
+  .btn{flex:1;padding:13px;border-radius:14px;background:var(--chip);font-size:14px;font-weight:500;text-align:center}
+  .btn.danger{color:#c0392b}
+  .btn.dark{background:var(--ink);color:#fff}
+  .f-title{text-align:center;font-weight:500;margin-bottom:14px}
+  .pick{display:flex;align-items:center;justify-content:center;aspect-ratio:1.5;border-radius:18px;background:#fff;color:var(--mute);font-size:13px;overflow:hidden;position:relative;width:100%}
+  .pick img{max-width:70%;max-height:85%;object-fit:contain}
+  .pick .hint{position:absolute;bottom:10px;font-size:11.5px;color:var(--soft)}
+  .pick-av{margin:6px auto 8px;width:112px;height:112px;font-size:13px;color:var(--mute);background:#fff;border:1.5px dashed #d6d6d6}
+  .field{display:block;border-bottom:1px solid var(--line);padding:14px 0 10px}
+  .field span{display:block;font-size:11.5px;color:var(--mute);margin-bottom:5px}
+  .field input,.field textarea{width:100%;border:0;background:transparent;outline:none;font-size:15.5px;padding:0;resize:none}
+  .field textarea{min-height:60px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .cats{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .cats button{padding:6px 11px;border-radius:999px;background:#fff;font-size:13px;color:#555}
+  .cats button.on{background:var(--ink);color:#fff}
+  .link-box{display:flex;align-items:center;gap:8px;background:#fff;border-radius:16px;padding:6px 6px 6px 16px;margin-bottom:6px}
+  .link-box input{flex:1;min-width:0;border:0;outline:none;background:transparent;font-size:15px;padding:9px 0}
+  .auto{flex:none;background:var(--ink);color:#fff;border-radius:12px;padding:9px 13px;font-size:13px;font-weight:500}
+  .auto[hidden]{display:none}
+  .auto-status{font-size:12.5px;color:var(--mute);text-align:center;min-height:0;max-height:0;overflow:hidden;transition:max-height .3s,margin .3s;margin:0}
+  .auto-status.on{max-height:60px;margin:4px 0 12px}
+  .auto-status.ok{color:#4a6b00}
+  .auto-status.warn{color:#9a6a00}
+  .auto-status .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ink);margin-right:7px;vertical-align:1px;animation:pulse 1s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.2;transform:scale(.6)}}
+  .field input.filled,.field textarea.filled{animation:flash 1.2s ease}
+  @keyframes flash{0%{background:var(--lime)}100%{background:transparent}}
+  .err{color:#c0392b;font-size:13px;text-align:center;margin-top:10px;min-height:1em}
+  .toast{position:fixed;top:calc(env(safe-area-inset-top) + 14px);left:50%;transform:translate(-50%,-80px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:13px;transition:transform .3s;z-index:20;white-space:nowrap}
+  .toast.on{transform:translate(-50%,0)}
+  @media (prefers-reduced-motion: reduce){ .person{animation:none} #list.anim,.l-inner,#home{transition-duration:.01s} }
+
+  .pick-row{display:flex;gap:14px;overflow-x:auto;padding:4px 2px 2px;justify-content:center;flex-wrap:wrap}
+  .pick-person{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12.5px}
+  .pick-person .av{width:56px;height:56px;font-size:17px}
+  .person.setup .av{background:#fff;color:var(--soft);font-size:30px;font-weight:300;border:1.5px dashed #d6d6d6;box-shadow:none}
+  .btn:disabled{opacity:.6}
+</style>
+</head>
+<body>
+
+<section id="home">
+  <div class="h-top"><div class="logo">akkidellie</div><div class="h-sub" id="h-sub"></div></div>
+  <div class="orbit" id="orbit"><div class="empty-state">Loading…</div></div>
+  <div class="h-foot">tap a circle to fall into a wishlist</div>
+</section>
+
+<section id="list"><div class="l-inner" id="l-inner"></div></section>
+
+<div class="dock" id="dock">
+  <div class="pill" id="pill"></div>
+  <button class="add" id="add" hidden aria-label="Add a wish">+</button>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<section class="sheet" id="detail"></section>
+<section class="sheet" id="form"></section>
+<div class="toast" id="toast"></div>
+<input type="file" id="file" accept="image/*" hidden>
+
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+import { SUPABASE_URL, SUPABASE_KEY } from "./config.js";
+
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+const BUCKET = "images";
+const DEFAULT_CATS = ["Tech","Beauty","Clothes","Home","Books","Experiences","Other"];
+const ME_KEY = "akkidellie.me";
+const S = { items:[], people:[], me:null, view:null, cat:"All", editing:null, draft:null, openId:null, anim:false, loaded:false };
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const safeUrl = u => { if(!u) return ""; let s=String(u).trim(); if(!/^https?:\/\//i.test(s)) s="https://"+s; try{const x=new URL(s); return /^https?:$/.test(x.protocol)?x.href:"";}catch(e){return "";} };
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+function toast(m){ const t=$("toast"); t.textContent=m; t.classList.add("on"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("on"),2200); }
+const lsGet = k => { try{ return localStorage.getItem(k); }catch(e){ return null; } };
+const lsSet = (k,v) => { try{ v==null ? localStorage.removeItem(k) : localStorage.setItem(k,v); }catch(e){} };
+
+/* ---------- people helpers ---------- */
+const personById = id => S.people.find(p => p.id === id) || null;
+const displayName = id => personById(id)?.name || "Friend";
+const isMine = id => !!S.me && id === S.me;
+function avatarHTML(id){
+  const p = personById(id);
+  if(p?.avatar_url) return `<img src="${esc(p.avatar_url)}" alt="">`;
+  const parts = (p?.name || "?").trim().split(/\s+/);
+  return esc(((parts[0]||"?")[0] + (parts[1]?.[0]||"")).toUpperCase());
+}
+function personList(){
+  return [...S.people].sort((a,b) => (a.id===S.me?-1:b.id===S.me?1:0) || (a.created_at||"").localeCompare(b.created_at||"")).map(p=>p.id);
+}
+
+/* ---------- data ---------- */
+async function load(){
+  const [p, i] = await Promise.all([
+    sb.from("people").select("*"),
+    sb.from("items").select("*").order("created_at", { ascending:false })
+  ]);
+  if(p.error || i.error) throw (p.error || i.error);
+  S.people = p.data; S.items = i.data;
+  if(S.me && !personById(S.me)){ S.me = null; lsSet(ME_KEY, null); }
+  S.loaded = true;
+  renderAll();
+}
+let reloadT;
+const scheduleReload = () => { clearTimeout(reloadT); reloadT = setTimeout(() => load().catch(()=>{}), 250); };
+
+(async () => {
+  S.me = lsGet(ME_KEY);
+  const timer = setTimeout(()=>{ if(!S.loaded) $("orbit").innerHTML = `<div class="empty-state"><b>Can't reach the wishlists yet</b>Check your connection.</div>`; }, 10000);
+  try{ await load(); clearTimeout(timer); }
+  catch(e){ clearTimeout(timer); $("orbit").innerHTML = `<div class="empty-state"><b>The wishlists aren't available right now</b>Try again in a moment.</div>`; return; }
+  sb.channel("all")
+    .on("postgres_changes", { event:"*", schema:"public", table:"items" }, scheduleReload)
+    .on("postgres_changes", { event:"*", schema:"public", table:"people" }, scheduleReload)
+    .subscribe();
+  document.addEventListener("visibilitychange", () => { if(!document.hidden) scheduleReload(); });
+  if(!S.me) setTimeout(openWelcome, 500);
+})();
+
+function renderAll(){
+  renderHome();
+  if(S.view){ if(!personById(S.view)) { S.view=null; closeListNow(); } else { renderList(); renderDock(); } }
+  if(S.openId){ if(S.items.find(i=>i.id===S.openId)) openDetail(S.openId, true); else closeSheets(); }
+}
+
+/* ---------- home ---------- */
+function renderHome(){
+  const ppl = personList();
+  const open = S.items.filter(i=>!i.done).length;
+  $("h-sub").textContent = open ? `${open} wishes` : "";
+  let html = ppl.map(id => {
+    const n = S.items.filter(i=>i.person_id===id && !i.done).length;
+    return `<button class="person" data-person="${esc(id)}">
+      <div class="av">${avatarHTML(id)}${isMine(id) ? `<span class="edit-me" data-editme="1">✎</span>` : ``}</div>
+      <div class="pn">${esc(displayName(id))}${isMine(id) ? " (you)" : ""}</div>
+      <div class="pc">${n ? n + (n===1?" wish":" wishes") : "no wishes yet"}</div>
+    </button>`;
+  }).join("");
+  if(!S.me) html += `<button class="person setup" data-join="1"><div class="av">+</div><div class="pn">Join</div><div class="pc">add your circle</div></button>`;
+  $("orbit").innerHTML = html || `<div class="empty-state"><b>No one here yet</b></div>`;
+}
+
+/* ---------- the fall ---------- */
+function circleAt(el){ const r = el.getBoundingClientRect(); return { x:r.left+r.width/2, y:r.top+r.height/2, r:r.width/2 }; }
+const coverR = (x,y) => Math.hypot(Math.max(x, innerWidth-x), Math.max(y, innerHeight-y)) + 20;
+
+async function fallInto(pid, fromEl){
+  if(S.anim) return; S.anim = true;
+  const c = fromEl ? circleAt(fromEl) : { x:innerWidth/2, y:innerHeight/2, r:30 };
+  S.view = pid; S.cat = "All"; renderList(); renderDock();
+  const L = $("list"), H = $("home");
+  L.scrollTop = 0; L.classList.remove("anim","shown");
+  L.style.clipPath = `circle(${c.r}px at ${c.x}px ${c.y}px)`;
+  L.classList.add("open"); H.style.transformOrigin = `${c.x}px ${c.y}px`;
+  void L.offsetWidth;
+  L.classList.add("anim","shown");
+  L.style.clipPath = `circle(${coverR(c.x,c.y)}px at ${c.x}px ${c.y}px)`;
+  H.style.transform = "scale(2.4)"; H.classList.add("away");
+  $("dock").classList.add("on");
+  history.replaceState(null, "", "#" + pid);
+  await sleep(780); L.style.clipPath = "none"; S.anim = false;
+}
+function closeListNow(){ const L=$("list"),H=$("home"); L.classList.remove("open","anim","shown"); H.style.transform="none"; H.classList.remove("away"); $("dock").classList.remove("on"); history.replaceState(null,"",location.pathname); }
+async function climbOut(){
+  if(S.anim || !S.view) return; S.anim = true;
+  const pid = S.view, H = $("home"), L = $("list");
+  const target = document.querySelector(`.person[data-person="${CSS.escape(pid)}"] .av`);
+  let c = { x:innerWidth/2, y:innerHeight/2, r:30 };
+  if(target){ H.style.transition="none"; H.style.transform="none"; c = circleAt(target); H.style.transform="scale(2.4)"; void H.offsetWidth; H.style.transition=""; }
+  H.style.transformOrigin = `${c.x}px ${c.y}px`;
+  L.classList.remove("anim"); L.style.clipPath = `circle(${coverR(c.x,c.y)}px at ${c.x}px ${c.y}px)`;
+  void L.offsetWidth;
+  L.classList.add("anim"); L.classList.remove("shown");
+  L.style.clipPath = `circle(${c.r}px at ${c.x}px ${c.y}px)`;
+  H.style.transform = "none"; H.classList.remove("away"); $("dock").classList.remove("on");
+  history.replaceState(null, "", location.pathname);
+  await sleep(760); L.classList.remove("open","anim"); S.view = null; S.anim = false;
+}
+async function hopTo(pid, fromEl){
+  if(S.anim || pid === S.view) return; S.anim = true;
+  const c = circleAt(fromEl), L = $("list");
+  L.classList.remove("anim"); L.style.clipPath = `circle(${coverR(c.x,c.y)}px at ${c.x}px ${c.y}px)`;
+  void L.offsetWidth;
+  L.classList.add("anim"); L.classList.remove("shown"); L.style.clipPath = `circle(${c.r}px at ${c.x}px ${c.y}px)`;
+  await sleep(520);
+  S.view = pid; S.cat = "All"; renderList(); renderDock(); L.scrollTop = 0;
+  history.replaceState(null, "", "#" + pid);
+  void L.offsetWidth;
+  L.classList.add("shown"); L.style.clipPath = `circle(${coverR(c.x,c.y)}px at ${c.x}px ${c.y}px)`;
+  await sleep(780); L.style.clipPath = "none"; S.anim = false;
+}
+
+/* ---------- list ---------- */
+function renderList(){
+  const pid = S.view; if(!pid) return;
+  const mine = S.items.filter(i => i.person_id === pid);
+  const open = mine.filter(i=>!i.done), done = mine.filter(i=>i.done);
+  const counts = {}; open.forEach(i => { const c=i.category||"Other"; counts[c]=(counts[c]||0)+1; });
+  const cats = Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
+  if(S.cat!=="All" && S.cat!=="Completed" && !counts[S.cat]) S.cat="All";
+  const chips = [["All",open.length], ...cats.map(c=>[c,counts[c]]), ["Completed",done.length]];
+  const list = S.cat==="Completed" ? done : open.filter(i => S.cat==="All" || (i.category||"Other")===S.cat);
+  const own = isMine(pid);
+  $("l-inner").innerHTML = `
+    <div class="l-top">
+      <button class="round" id="back" aria-label="Back">‹</button>
+      <div class="l-title">${esc(own ? "your wishlist" : displayName(pid) + "'s wishlist")}</div>
+      <button class="round" id="share" aria-label="Copy link">↗</button>
+    </div>
+    <nav class="chips">${chips.map(([c,n]) => `<button class="chip ${S.cat===c?'on':''}" data-cat="${esc(c)}">${esc(c)}<span class="n">${n}</span></button>`).join("")}</nav>
+    ${list.length ? `<div class="grid">${list.map((it,k) => `
+      <button class="item ${it.done?'done':''}" data-id="${esc(it.id)}" style="animation-delay:${200+Math.min(k,12)*35}ms">
+        <div class="ph ${it.image_url?'':'empty'}">${it.image_url ? `<img src="${esc(it.image_url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : esc((it.name||"?")[0].toUpperCase())}</div>
+        <div class="nm">${esc(it.name)}</div>
+        ${it.brand ? `<div class="br">${esc(it.brand)}</div>` : ``}
+      </button>`).join("")}</div>`
+    : S.cat==="Completed"
+      ? `<div class="empty-state"><b>Nothing completed yet</b>Wishes marked as done land here.</div>`
+      : `<div class="empty-state"><b>${own ? "Your wishlist is empty" : "Nothing here yet"}</b>${own ? "Tap + to add the first thing." : ""}</div>`}`;
+  $("back").onclick = climbOut;
+  $("share").onclick = async () => {
+    const url = location.origin + location.pathname + "#" + pid;
+    try{ if(navigator.share) await navigator.share({ title: "akkidellie", url }); else { await navigator.clipboard.writeText(url); toast("Link copied"); } }catch(e){}
+  };
+  $("add").hidden = !own;
+}
+function renderDock(){
+  $("pill").innerHTML = personList().map(id => `<button data-hop="${esc(id)}" class="${id===S.view?'cur':''}" aria-label="${esc(displayName(id))}"><div class="av">${avatarHTML(id)}</div></button>`).join("")
+    + `<button class="home-btn" data-home="1" aria-label="All circles">◯</button>`;
+}
+
+/* ---------- clicks ---------- */
+document.addEventListener("click", e => {
+  if(e.target.closest("[data-editme]")){ e.stopPropagation(); openProfile(); return; }
+  if(e.target.closest("[data-join]")){ openWelcome(); return; }
+  const p = e.target.closest(".person[data-person]"); if(p){ fallInto(p.dataset.person, p.querySelector(".av")); return; }
+  const h = e.target.closest("[data-hop]"); if(h){ hopTo(h.dataset.hop, h.querySelector(".av")); return; }
+  if(e.target.closest("[data-home]")){ climbOut(); return; }
+  const c = e.target.closest("[data-cat]"); if(c){ S.cat = c.dataset.cat; renderList(); return; }
+  const it = e.target.closest(".item[data-id]"); if(it){ openDetail(it.dataset.id); }
+});
+// deep link: …/#<person id> opens that wishlist
+window.addEventListener("load", () => setTimeout(() => {
+  const id = location.hash.slice(1);
+  if(id && personById(id)) fallInto(id, document.querySelector(`.person[data-person="${CSS.escape(id)}"] .av`));
+}, 900));
+
+/* ---------- sheets ---------- */
+function openSheet(id){ $("scrim").classList.add("on"); $(id).classList.add("on"); }
+function closeSheets(){ ["detail","form"].forEach(id=>$(id).classList.remove("on")); $("scrim").classList.remove("on"); S.openId=null; }
+$("scrim").onclick = () => { if(S.me) closeSheets(); };
+
+function openDetail(id, refresh){
+  const it = S.items.find(i=>i.id===id); if(!it) return;
+  S.openId = id;
+  const url = safeUrl(it.link);
+  const when = it.created_at ? new Date(it.created_at).toLocaleDateString(undefined,{day:"numeric",month:"short"}) : "";
+  const own = isMine(it.person_id);
+  $("detail").innerHTML = `
+    <div class="grab"></div>
+    ${it.image_url ? `<div class="d-img"><img src="${esc(it.image_url)}" alt="" referrerpolicy="no-referrer"></div>` : `<div style="height:20px"></div>`}
+    <div class="d-name">${esc(it.name)}</div>
+    ${it.brand ? `<div class="d-brand">${esc(it.brand)}</div>` : ``}
+    ${it.price ? `<div class="d-price">${esc(it.price)}</div>` : ``}
+    ${it.description ? `<p class="d-desc">${esc(it.description)}</p>` : ``}
+    ${url ? `<a class="d-link" href="${esc(url)}" target="_blank" rel="noopener">Open link ↗</a>` : ``}
+    ${S.me ? `<div class="row">
+      <button class="btn" id="d-done">${it.done ? "Move back" : "Mark completed"}</button>
+      ${own ? `<button class="btn" id="d-edit">Edit</button>` : ``}
+    </div>` : ``}
+    ${own ? `<div class="row"><button class="btn danger" id="d-del">Delete</button></div>` : ``}
+    <div class="d-meta">${esc(it.category||"Other")} · ${esc(own ? "your wish" : displayName(it.person_id)+"'s wish")}${when ? " · "+esc(when) : ""}</div>`;
+  if(!refresh) openSheet("detail");
+  if(!S.me) return;
+  $("d-done").onclick = async () => {
+    const { error } = await sb.from("items").update({ done: !it.done }).eq("id", id);
+    if(error) return toast("Couldn't save — try again");
+    it.done = !it.done; toast(it.done ? "Completed ✓" : "Moved back"); closeSheets(); renderAll();
+  };
+  if(!own) return;
+  $("d-edit").onclick = () => { $("detail").classList.remove("on"); openForm(it); };
+  const del = $("d-del");
+  del.onclick = async () => {
+    if(del.dataset.armed!=="1"){ del.dataset.armed="1"; del.textContent="Tap again to delete"; setTimeout(()=>{ if(del.isConnected){ del.dataset.armed=""; del.textContent="Delete"; } },3000); return; }
+    const { error } = await sb.from("items").delete().eq("id", id);
+    if(error) return toast("Couldn't delete — try again");
+    S.items = S.items.filter(i=>i.id!==id); closeSheets(); renderAll(); toast("Deleted");
+  };
+}
+
+/* ---------- images ---------- */
+let pickTarget = null;
+$("file").onchange = async e => {
+  const f = e.target.files[0]; e.target.value=""; if(!f || !pickTarget) return;
+  await useImageFile(f, pickTarget === "avatar");
+};
+async function useImageFile(f, square){
+  try{
+    const blob = await shrink(f, square ? 400 : 1000, square);
+    const preview = URL.createObjectURL(blob);
+    S.draft = { blob, preview };
+    const el = $(square ? "pick-av" : "pick"); if(el) el.innerHTML = `<img src="${preview}" alt="">`;
+  }catch(err){ const er=$("f-err"); if(er) er.textContent = "Couldn't read that image"; }
+}
+function shrink(file, max, square){
+  return new Promise((res, rej) => {
+    const img = new Image(); const u = URL.createObjectURL(file);
+    img.onload = () => {
+      let sx=0, sy=0, sw=img.width, sh=img.height;
+      if(square){ const m=Math.min(sw,sh); sx=(sw-m)/2; sy=(sh-m)/2; sw=sh=m; }
+      const r = Math.min(1, max/Math.max(sw,sh));
+      const c = document.createElement("canvas"); c.width=Math.round(sw*r); c.height=Math.round(sh*r);
+      const x = c.getContext("2d"); x.fillStyle="#fff"; x.fillRect(0,0,c.width,c.height); x.drawImage(img,sx,sy,sw,sh,0,0,c.width,c.height);
+      URL.revokeObjectURL(u); c.toBlob(b => b ? res(b) : rej(), "image/jpeg", .86);
+    };
+    img.onerror = rej; img.src = u;
+  });
+}
+async function uploadImage(blob){
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2,8)}.jpg`;
+  const { error } = await sb.storage.from(BUCKET).upload(path, blob, { contentType:"image/jpeg", upsert:false });
+  if(error) throw error;
+  return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+}
+document.addEventListener("paste", async e => {
+  if(!$("form").classList.contains("on")) return;
+  const f = [...(e.clipboardData?.files || [])].find(x => x.type.startsWith("image/"));
+  if(!f) return;
+  e.preventDefault();
+  await useImageFile(f, !!$("pick-av"));
+});
+
+/* ---------- welcome / profile ---------- */
+function openWelcome(){
+  const others = personList();
+  $("form").innerHTML = `
+    <div class="grab"></div>
+    <div class="f-title">Welcome to akkidellie</div>
+    ${others.length ? `<p class="d-meta" style="margin:0 0 10px">Already have a circle? Tap it.</p>
+      <div class="pick-row">${others.map(id => `<button class="pick-person" data-pick="${esc(id)}"><div class="av">${avatarHTML(id)}</div><span>${esc(displayName(id))}</span></button>`).join("")}</div>
+      <p class="d-meta" style="margin:18px 0 0">or make a new one</p>` : ``}
+    <button class="av pick-av" id="pick-av" type="button">Add photo</button>
+    <label class="field"><span>Your name</span><input id="p-name" maxlength="30" placeholder="Akki"></label>
+    <div class="err" id="f-err"></div>
+    <div class="row"><button class="btn" id="p-later">Just looking</button><button class="btn dark" id="p-save">Create my circle</button></div>`;
+  S.draft = null;
+  $("form").querySelectorAll("[data-pick]").forEach(b => b.onclick = () => { S.me = b.dataset.pick; lsSet(ME_KEY, S.me); closeSheets(); renderAll(); toast(`Hi, ${displayName(S.me)}`); });
+  $("pick-av").onclick = () => { pickTarget="avatar"; $("file").click(); };
+  $("p-later").onclick = closeSheets;
+  $("p-save").onclick = () => saveProfile(true);
+  openSheet("form");
+}
+function openProfile(){
+  const p = personById(S.me); if(!p) return openWelcome();
+  S.draft = null;
+  $("form").innerHTML = `
+    <div class="grab"></div>
+    <div class="f-title">Your circle</div>
+    <button class="av pick-av" id="pick-av" type="button">${p.avatar_url ? `<img src="${esc(p.avatar_url)}" alt="">` : "Add photo"}</button>
+    <label class="field"><span>Name</span><input id="p-name" maxlength="30" value="${esc(p.name)}"></label>
+    <div class="err" id="f-err"></div>
+    <div class="row"><button class="btn" id="p-cancel">Cancel</button><button class="btn dark" id="p-save">Save</button></div>
+    <div class="row"><button class="btn" id="p-out" style="background:transparent;color:var(--mute);font-weight:400">This isn't me — switch circle</button></div>`;
+  $("pick-av").onclick = () => { pickTarget="avatar"; $("file").click(); };
+  $("p-cancel").onclick = closeSheets;
+  $("p-out").onclick = () => { S.me = null; lsSet(ME_KEY, null); closeSheets(); renderAll(); setTimeout(openWelcome, 350); };
+  $("p-save").onclick = () => saveProfile(false);
+  openSheet("form");
+}
+async function saveProfile(isNew){
+  const name = $("p-name").value.trim();
+  if(!name){ $("f-err").textContent="Add your name"; $("p-name").focus(); return; }
+  const btn = $("p-save"); btn.textContent = "Saving…"; btn.disabled = true;
+  try{
+    let avatar_url = isNew ? null : personById(S.me)?.avatar_url || null;
+    if(S.draft?.blob) avatar_url = await uploadImage(S.draft.blob);
+    if(isNew){
+      const { data, error } = await sb.from("people").insert({ name, avatar_url }).select().single();
+      if(error) throw error;
+      S.me = data.id; lsSet(ME_KEY, S.me); S.people.push(data);
+    } else {
+      const { error } = await sb.from("people").update({ name, avatar_url }).eq("id", S.me);
+      if(error) throw error;
+      Object.assign(personById(S.me), { name, avatar_url });
+    }
+    closeSheets(); renderAll(); toast(isNew ? "Your circle is ready" : "Saved");
+  }catch(e){ $("f-err").textContent = "Couldn't save — try again"; btn.textContent = isNew ? "Create my circle" : "Save"; btn.disabled = false; }
+}
+
+/* ---------- item form ---------- */
+$("add").onclick = () => openForm(null);
+function openForm(it){
+  S.editing = it; S.draft = it?.image_url ? { remote: it.image_url } : null;
+  const cats = [...new Set([...S.items.map(i=>i.category).filter(Boolean), ...DEFAULT_CATS])];
+  const cur = it?.category || "";
+  $("form").innerHTML = `
+    <div class="grab"></div>
+    <div class="f-title">${it ? "Edit wish" : "New wish"}</div>
+    <div class="link-box">
+      <input id="f-link" inputmode="url" autocomplete="off" value="${esc(it?.link)}" placeholder="Paste a link — Amazon, Ozon, any shop">
+      <button type="button" id="f-auto" class="auto" hidden>✦ Fill</button>
+    </div>
+    <div class="auto-status" id="f-status"></div>
+    <button class="pick" id="pick" type="button">${it?.image_url ? `<img src="${esc(it.image_url)}" alt="" referrerpolicy="no-referrer">` : "Add photo"}<span class="hint">tap to choose · or paste a copied image</span></button>
+    <label class="field"><span>Name</span><input id="f-name" maxlength="120" value="${esc(it?.name)}" placeholder="AirPods Max"></label>
+    <div class="two">
+      <label class="field"><span>Brand</span><input id="f-brand" maxlength="40" value="${esc(it?.brand)}" placeholder="Apple"></label>
+      <label class="field"><span>Price</span><input id="f-price" maxlength="24" value="${esc(it?.price)}" placeholder="$549"></label>
+    </div>
+    <label class="field"><span>Description</span><textarea id="f-desc" maxlength="600" placeholder="Size, colour, why you want it…">${esc(it?.description)}</textarea></label>
+    <div class="field" style="border:0"><span>Category</span>
+      <div class="cats" id="f-cats">${cats.map(c=>`<button type="button" data-c="${esc(c)}" class="${c===cur?'on':''}">${esc(c)}</button>`).join("")}<button type="button" data-c="__new">+ new</button></div>
+    </div>
+    <div class="err" id="f-err"></div>
+    <div class="row"><button class="btn" id="f-cancel">Cancel</button><button class="btn dark" id="f-save">${it ? "Save" : "Add to list"}</button></div>`;
+  const form = { category: cur };
+  form.setCat = c => {
+    if(!c) return;
+    let b = [...$("f-cats").querySelectorAll("button[data-c]")].find(x => x.dataset.c.toLowerCase() === c.toLowerCase());
+    if(!b){ b = document.createElement("button"); b.type="button"; b.dataset.c=c; b.textContent=c; $("f-cats").prepend(b); }
+    form.category = b.dataset.c; $("f-cats").querySelectorAll("button").forEach(x=>x.classList.toggle("on", x===b));
+  };
+  $("f-cats").onclick = e => {
+    const b = e.target.closest("button"); if(!b) return;
+    if(b.dataset.c==="__new"){
+      const inp=document.createElement("input"); inp.placeholder="Category"; inp.maxLength=24;
+      inp.style.cssText="border:0;border-radius:999px;padding:6px 11px;font-size:13px;width:110px;outline:none";
+      b.replaceWith(inp); inp.focus();
+      inp.oninput=()=>{ form.category=inp.value.trim(); $("f-cats").querySelectorAll("button").forEach(x=>x.classList.remove("on")); };
+      return;
+    }
+    form.setCat(b.dataset.c);
+  };
+  $("pick").onclick = () => { pickTarget="item"; $("file").click(); };
+  $("f-cancel").onclick = () => { autoCtl?.abort(); closeSheets(); };
+  $("f-save").onclick = () => save(form.category);
+
+  const linkEl = $("f-link"), autoBtn = $("f-auto");
+  const refreshBtn = () => { autoBtn.hidden = !extractUrl(linkEl.value); };
+  linkEl.addEventListener("input", refreshBtn);
+  linkEl.addEventListener("paste", () => setTimeout(() => {
+    refreshBtn();
+    if(!S.editing && extractUrl(linkEl.value) && !$("f-name").value.trim()) autofill(form);
+  }, 0));
+  autoBtn.onclick = () => autofill(form);
+  refreshBtn();
+  openSheet("form");
+  if(!it) setTimeout(()=>linkEl.focus({preventScroll:true}), 350);
+}
+
+/* ---------- autofill from a link ---------- */
+let autoCtl = null;
+function extractUrl(text){
+  const m = String(text||"").match(/https?:\/\/[^\s<>"']+/i) || String(text||"").match(/\b(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)+\/[^\s<>"']*/i);
+  return m ? m[0].replace(/[),.;!?]+$/, "") : "";
+}
+const CAT_WORDS = {
+  Tech:/headphone|наушник|iphone|phone|телефон|laptop|ноутбук|macbook|ipad|tablet|планшет|camera|камер|kindle|watch|час|keyboard|клавиатур|mouse|мыш|speaker|колонк|airpods|charger|заряд|console|playstation|nintendo|xbox/i,
+  Beauty:/cream|крем|serum|сыворот|шампун|shampoo|parfum|perfume|парфюм|духи|помад|lipstick|mascara|туш|skincare|уход|маск|mask|лосьон|lotion|make.?up|макияж/i,
+  Clothes:/dress|плать|shirt|рубаш|футболк|t-shirt|jeans|джинс|jacket|куртк|пальто|coat|sneaker|кроссовк|shoe|обув|ботин|boot|hoodie|худи|свитер|sweater|bag|сумк|юбк|skirt/i,
+  Home:/кружк|mug|cup|чашк|lamp|ламп|pillow|подушк|blanket|плед|посуд|kitchen|кухн|candle|свеч|пятновывод|отбелив|чистящ|clean|стирк|порош|ваза|vase|полотен|towel/i,
+  Books:/book|книг|novel|роман/i,
+};
+const guessCat = t => Object.keys(CAT_WORDS).find(k => CAT_WORDS[k].test(t)) || "";
+function slugGuess(url){
+  try{
+    const u = new URL(url); const segs = u.pathname.split("/").filter(Boolean);
+    const best = segs.map(s => decodeURIComponent(s)).filter(s => /[a-zа-я]{3,}.*-.*[a-zа-я]{3,}/i.test(s)).sort((a,b)=>b.length-a.length)[0];
+    if(!best) return "";
+    let t = best.replace(/\.(html?|php)$/,"").replace(/-\d{5,}$/,"").replace(/[-_]+/g," ").trim();
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }catch(e){ return ""; }
+}
+async function autofill(form){
+  const raw = $("f-link").value.trim(), url = extractUrl(raw);
+  if(!url) return;
+  const shareText = raw.replace(url, "").trim();
+  if(shareText) $("f-link").value = url;
+  autoCtl?.abort(); autoCtl = new AbortController(); const ctl = autoCtl;
+  const st = $("f-status"), btn = $("f-auto");
+  st.className = "auto-status on"; st.innerHTML = `<span class="dot"></span>Opening the shop page…`; btn.hidden = true;
+  let r = {};
+  try{
+    const { data, error } = await sb.functions.invoke("preview", { body: { url } });
+    if(!error && data) r = data;
+  }catch(e){}
+  if(ctl.signal.aborted || !$("form").classList.contains("on")) return;
+  if(r.name && r.name.length > 60 && r.name.includes(",")) r.name = r.name.split(",")[0];
+  if(!r.name && shareText) r.name = shareText.replace(/\s+/g," ").slice(0,120);
+  if(!r.name) r.name = slugGuess(url);
+  const fill = (id, v) => { const el = $(id); v = String(v||"").trim(); if(v && !el.value.trim()){ el.value = v; el.classList.add("filled"); setTimeout(()=>el.classList.remove("filled"), 1200); } };
+  fill("f-name", r.name); fill("f-brand", r.brand); fill("f-price", r.price); fill("f-desc", r.description);
+  let gotImg = false;
+  if(r.image && !S.draft?.blob){
+    S.draft = { remote: r.image };
+    $("pick").innerHTML = `<img src="${esc(r.image)}" alt="" referrerpolicy="no-referrer">`;
+    gotImg = true;
+  }
+  if(!form.category){ const g = guessCat(`${r.name} ${r.description||""} ${url}`); if(g) form.setCat(g); }
+  btn.hidden = false; btn.textContent = "✦ Refill";
+  if(r.name && (r.image || r.price)){ st.className = "auto-status on ok"; st.textContent = "Filled in ✓ — check the details"; }
+  else if(r.name){ st.className = "auto-status on warn"; st.textContent = "The shop didn't share its photo — tap the photo area to add one"; }
+  else { st.className = "auto-status on warn"; st.textContent = "Couldn't read this shop page — fill it in by hand"; }
+}
+
+let saving=false;
+async function save(category){
+  if(saving) return;
+  const name = $("f-name").value.trim();
+  if(!name){ $("f-err").textContent="Give it a name"; $("f-name").focus(); return; }
+  saving=true; $("f-save").textContent="Saving…";
+  try{
+    let image_url = S.draft?.remote || null;
+    if(S.draft?.blob) image_url = await uploadImage(S.draft.blob);
+    const body = { name, brand:$("f-brand").value.trim(), price:$("f-price").value.trim(),
+                   link:(extractUrl($("f-link").value)||$("f-link").value.trim()), description:$("f-desc").value.trim(),
+                   category: category||"Other", image_url };
+    if(S.editing){
+      const { error } = await sb.from("items").update(body).eq("id", S.editing.id); if(error) throw error;
+      Object.assign(S.items.find(i=>i.id===S.editing.id) || {}, body); toast("Saved");
+    } else {
+      const { data, error } = await sb.from("items").insert({ ...body, person_id:S.me, done:false }).select().single(); if(error) throw error;
+      S.items.unshift(data); toast("Added to your list");
+    }
+    closeSheets(); renderAll();
+  }catch(e){ $("f-err").textContent = "Couldn't save — try again"; }
+  finally{ saving=false; const b=$("f-save"); if(b) b.textContent = S.editing ? "Save" : "Add to list"; }
+}
+
+</script>
+</body>
+</html>
