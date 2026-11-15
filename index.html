@@ -205,6 +205,19 @@
   .pf-link{display:block;width:100%;text-align:center;color:var(--mute);font-size:13px;margin-top:26px;padding:8px}
   .pf-form{margin-top:22px;background:#fff;border-radius:20px;padding:4px 18px}
   .pf-form .field:last-child{border-bottom:0}
+
+  /* ---------- background removal ---------- */
+  .pick.cut{background-color:#fff;background-image:linear-gradient(45deg,#efefee 25%,transparent 25%),linear-gradient(-45deg,#efefee 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#efefee 75%),linear-gradient(-45deg,transparent 75%,#efefee 75%);background-size:18px 18px;background-position:0 0,0 9px,9px -9px,-9px 0}
+  .pick.busy img{animation:breathe 1.4s ease-in-out infinite}
+  @keyframes breathe{50%{opacity:.45;filter:blur(1.5px)}}
+  .bg-row{display:flex;align-items:center;justify-content:center;gap:10px;min-height:0;margin:10px 0 2px}
+  .bg-btn{background:#fff;border-radius:999px;padding:8px 14px;font-size:13px;font-weight:500;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+  .bg-btn[hidden]{display:none}
+  .bg-btn:disabled{opacity:.7}
+  .bg-st{font-size:12px;color:var(--mute)}
+  .card .cimg.cutout{background:transparent;box-shadow:none;overflow:visible}
+  .card .cimg.cutout img{max-width:100%;max-height:100%;mix-blend-mode:normal;filter:drop-shadow(0 14px 16px rgba(0,0,0,.16))}
+  .d-img img.cutout{mix-blend-mode:normal;filter:drop-shadow(0 16px 20px rgba(0,0,0,.14))}
 </style>
 </head>
 <body>
@@ -538,7 +551,7 @@ function renderList(){
     maxX = Math.max(maxX, x + w); maxY = Math.max(maxY, y + h + 90);
     const img = it.image_url ? `<img src="${esc(it.image_url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : esc((it.name||"?")[0].toUpperCase());
     return `<button class="card ${it.done?'done':''}" data-id="${esc(it.id)}" style="left:${x}px;top:${y}px;width:${w}px;--d:${(.5 + r()*1).toFixed(2)};--r:${((r()-.5)*6).toFixed(2)};animation-delay:${120 + Math.min(k,14)*45}ms">
-      <div class="cimg ${it.image_url?'':'empty'}" style="height:${h}px">${img}</div>
+      <div class="cimg ${it.image_url ? (isCutout(it.image_url) ? 'cutout' : '') : 'empty'}" style="height:${h}px">${img}</div>
       <i class="string"></i>
       <div class="tag"><b>${esc(it.name)}</b>${it.brand || it.price ? `<span>${esc([it.brand, it.price].filter(Boolean).join(" · "))}</span>` : ``}</div>
     </button>`;
@@ -590,7 +603,7 @@ function openDetail(id, refresh){
   const own = isMine(it.person_id);
   $("detail").innerHTML = `
     <div class="grab"></div>
-    ${it.image_url ? `<div class="d-img"><img src="${esc(it.image_url)}" alt="" referrerpolicy="no-referrer"></div>` : `<div style="height:20px"></div>`}
+    ${it.image_url ? `<div class="d-img"><img src="${esc(it.image_url)}" alt="" referrerpolicy="no-referrer" class="${isCutout(it.image_url) ? 'cutout' : ''}"></div>` : `<div style="height:20px"></div>`}
     <div class="d-name">${esc(it.name)}</div>
     ${it.brand ? `<div class="d-brand">${esc(it.brand)}</div>` : ``}
     ${it.price ? `<div class="d-price">${esc(it.price)}</div>` : ``}
@@ -620,6 +633,77 @@ function openDetail(id, refresh){
   };
 }
 
+/* ---------- background removal (runs on the phone, model is cached after the first use) ---------- */
+const isCutout = u => !!u && /\/storage\/v1\/object\/public\/images\/[^?]+\.png(\?|$)/i.test(u);
+let RMBG = null;
+function loadRmbg(onProgress){
+  if(!RMBG) RMBG = (async () => {
+    const T = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1");
+    T.env.allowLocalModels = false;
+    const files = {};
+    const progress_callback = p => {
+      if(p.status === "progress" && p.total){ files[p.file] = [p.loaded, p.total]; let l = 0, t = 0; for(const [a,b] of Object.values(files)){ l += a; t += b; } onProgress && onProgress(l / t); }
+    };
+    const model = await T.AutoModel.from_pretrained("briaai/RMBG-1.4", { config:{ model_type:"custom" }, dtype:"q8", progress_callback });
+    const processor = await T.AutoProcessor.from_pretrained("briaai/RMBG-1.4", { config:{ do_normalize:true, do_pad:false, do_rescale:true, do_resize:true, image_mean:[.5,.5,.5], feature_extractor_type:"ImageFeatureExtractor", image_std:[1,1,1], resample:2, rescale_factor:1/255, size:{ width:1024, height:1024 } } });
+    return { T, model, processor };
+  })().catch(e => { RMBG = null; throw e; });
+  return RMBG;
+}
+async function removeBackground(src, onProgress){
+  const { T, model, processor } = await loadRmbg(onProgress);
+  const url = src instanceof Blob ? URL.createObjectURL(src) : src;
+  const image = await T.RawImage.fromURL(url);
+  if(src instanceof Blob) URL.revokeObjectURL(url);
+  const { pixel_values } = await processor(image);
+  const { output } = await model({ input: pixel_values });
+  const mask = await T.RawImage.fromTensor(output[0].mul(255).to("uint8")).resize(image.width, image.height);
+  const c = document.createElement("canvas"); c.width = image.width; c.height = image.height;
+  const ctx = c.getContext("2d"); ctx.drawImage(image.toCanvas(), 0, 0);
+  const px = ctx.getImageData(0, 0, c.width, c.height), a = mask.data;
+  let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+  for(let i = 0, y = 0; y < c.height; y++) for(let x = 0; x < c.width; x++, i++){
+    px.data[i*4 + 3] = a[i];
+    if(a[i] > 24){ if(x < x0) x0 = x; if(x > x1) x1 = x; if(y < y0) y0 = y; if(y > y1) y1 = y; }
+  }
+  if(x1 < 0) throw new Error("nothing found");
+  ctx.putImageData(px, 0, 0);
+  // trim to the object with a little air around it
+  const pad = Math.round(Math.max(x1 - x0, y1 - y0) * .04);
+  x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(c.width - 1, x1 + pad); y1 = Math.min(c.height - 1, y1 + pad);
+  const o = document.createElement("canvas"); o.width = x1 - x0 + 1; o.height = y1 - y0 + 1;
+  o.getContext("2d").drawImage(c, x0, y0, o.width, o.height, 0, 0, o.width, o.height);
+  return await new Promise((res, rej) => o.toBlob(b => b ? res(b) : rej(new Error("encode")), "image/png"));
+}
+function refreshBgBtn(){
+  const btn = $("f-bg"); if(!btn) return;
+  const has = !!(S.draft && (S.draft.blob || S.draft.remote));
+  btn.hidden = !has; btn.disabled = false;
+  btn.textContent = S.draft?.cut ? "↺ Restore background" : "✦ Remove background";
+  $("pick")?.classList.toggle("cut", !!S.draft?.cut);
+}
+async function toggleBackground(){
+  const btn = $("f-bg"), st = $("f-bgst"), pick = $("pick");
+  if(!S.draft) return;
+  if(S.draft.cut){ S.draft = S.draft.orig; showPickPreview(); refreshBgBtn(); st.textContent = ""; return; }
+  const before = S.draft, src = before.blob || before.remote;
+  btn.disabled = true; btn.textContent = "Removing…"; pick.classList.add("busy");
+  st.textContent = RMBG ? "" : "first time: getting the magic ready";
+  try{
+    const png = await removeBackground(src, f => { st.textContent = `downloading the magic · ${Math.round(f*100)}%`; });
+    if(S.draft !== before) return; // photo changed meanwhile
+    S.draft = { blob: png, preview: URL.createObjectURL(png), cut: true, orig: before };
+    showPickPreview(); st.textContent = "";
+  }catch(e){
+    st.textContent = before.remote && !before.blob ? "This shop's photo can't be edited — save it and add it from your phone" : "Couldn't remove the background — try another photo";
+  }finally{ pick.classList.remove("busy"); refreshBgBtn(); }
+}
+function showPickPreview(){
+  const el = $("pick"); if(!el || !S.draft) return;
+  const src = S.draft.preview || S.draft.remote;
+  el.innerHTML = `<img src="${esc(src)}" alt="" referrerpolicy="no-referrer">`;
+}
+
 /* ---------- images ---------- */
 let pickTarget = null;
 $("file").onchange = async e => {
@@ -632,6 +716,7 @@ async function useImageFile(f, square){
     const preview = URL.createObjectURL(blob);
     S.draft = { blob, preview };
     const el = $(square ? "pick-av" : "pick"); if(el) el.innerHTML = `<img src="${preview}" alt="">` + (el.classList.contains("pf-av") ? `<span class="cam">Change photo</span>` : ``);
+    if(!square){ refreshBgBtn(); const st = $("f-bgst"); if(st) st.textContent = ""; }
   }catch(err){ const er=$("f-err"); if(er) er.textContent = "Couldn't read that image"; }
 }
 function shrink(file, max, square){
@@ -649,8 +734,9 @@ function shrink(file, max, square){
   });
 }
 async function uploadImage(blob){
-  const path = `${Date.now()}-${Math.random().toString(36).slice(2,8)}.jpg`;
-  const { error } = await sb.storage.from(BUCKET).upload(path, blob, { contentType:"image/jpeg", upsert:false });
+  const png = blob.type === "image/png";
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2,8)}.${png ? "png" : "jpg"}`;
+  const { error } = await sb.storage.from(BUCKET).upload(path, blob, { contentType: png ? "image/png" : "image/jpeg", upsert:false });
   if(error) throw error;
   return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
 }
@@ -778,6 +864,7 @@ function openForm(it){
     </div>
     <div class="auto-status" id="f-status"></div>
     <button class="pick" id="pick" type="button">${it?.image_url ? `<img src="${esc(it.image_url)}" alt="" referrerpolicy="no-referrer">` : "Add photo"}<span class="hint">tap to choose · or paste a copied image</span></button>
+    <div class="bg-row"><button type="button" class="bg-btn" id="f-bg" hidden>✦ Remove background</button><span class="bg-st" id="f-bgst"></span></div>
     <label class="field"><span>Name</span><input id="f-name" maxlength="120" value="${esc(it?.name)}" placeholder="AirPods Max"></label>
     <div class="two">
       <label class="field"><span>Brand</span><input id="f-brand" maxlength="40" value="${esc(it?.brand)}" placeholder="Apple"></label>
@@ -808,6 +895,9 @@ function openForm(it){
     form.setCat(b.dataset.c);
   };
   $("pick").onclick = () => { pickTarget="item"; $("file").click(); };
+  $("f-bg").onclick = toggleBackground;
+  if(isCutout(it?.image_url)) $("pick").classList.add("cut");
+  refreshBgBtn(); if(S.draft?.remote && isCutout(S.draft.remote)) $("f-bg").hidden = true;
   $("f-cancel").onclick = () => { autoCtl?.abort(); closeSheets(); };
   $("f-save").onclick = () => save(form.category);
 
@@ -870,7 +960,7 @@ async function autofill(form){
   if(r.image && !S.draft?.blob){
     S.draft = { remote: r.image };
     $("pick").innerHTML = `<img src="${esc(r.image)}" alt="" referrerpolicy="no-referrer">`;
-    gotImg = true;
+    gotImg = true; refreshBgBtn();
   }
   if(!form.category){ const g = guessCat(`${r.name} ${r.description||""} ${url}`); if(g) form.setCat(g); }
   btn.hidden = false; btn.textContent = "✦ Refill";
