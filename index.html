@@ -224,6 +224,18 @@
   .themes button.on{background:var(--tc);color:var(--ti);font-weight:500;box-shadow:inset 0 0 0 1.5px var(--ti)}
   .themes button:active{transform:scale(.95)}
 
+  /* ---------- gift reservations (hidden from the wishlist owner) ---------- */
+  .card .rsv{position:absolute;left:-6px;top:14px;z-index:2;display:inline-flex;align-items:center;gap:5px;background:var(--ink);color:#fff;
+    font-size:11.5px;font-weight:500;padding:5px 10px 5px 8px;border-radius:999px;box-shadow:0 6px 14px rgba(0,0,0,.18);transform:rotate(-6deg);white-space:nowrap}
+  .card .rsv.mine{background:var(--lime);color:#2c3a00}
+  .card.taken .cimg{opacity:.55;filter:grayscale(.5)}
+  .gift{margin-top:18px;background:#fff;border-radius:18px;padding:14px 16px}
+  .gift .gl{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:500}
+  .gift .gl .av{width:30px;height:30px;font-size:11px}
+  .gift .gs{font-size:12px;color:var(--mute);margin-top:6px;line-height:1.45}
+  .gift .row{margin-top:12px}
+  .btn.gift-go{background:var(--lime);color:#2c3a00}
+
   /* ---------- background removal ---------- */
   .pick.cut{background-color:#fff;background-image:linear-gradient(45deg,#efefee 25%,transparent 25%),linear-gradient(-45deg,#efefee 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#efefee 75%),linear-gradient(-45deg,transparent 75%,#efefee 75%);background-size:18px 18px;background-position:0 0,0 9px,9px -9px,-9px 0}
   .pick.busy img{animation:breathe 1.4s ease-in-out infinite}
@@ -276,7 +288,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 const BUCKET = "images";
 const DEFAULT_CATS = ["Tech","Beauty","Clothes","Home","Books","Experiences","Other"];
 const ME_KEY = "akkidellie.me";
-const S = { items:[], people:[], me:null, view:null, cat:"All", editing:null, draft:null, openId:null, anim:false, loaded:false };
+const S = { res:{}, items:[], people:[], me:null, view:null, cat:"All", editing:null, draft:null, openId:null, anim:false, loaded:false };
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -426,16 +438,18 @@ class Board{
 }
 ["gesturestart","gesturechange"].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive:false }));
 const HB = new Board($("hb"), $("hw"), $("hz"), { top:80, bottom:60, fitMax:1 });
-const LB = new Board($("lb"), $("lw"), $("lz"), { top:118, bottom:90, fitMax:1, colW:540 });
+const LB = new Board($("lb"), $("lw"), $("lz"), { top:118, bottom:90, fitMax:1, colW:470 });
 
 /* ---------- data ---------- */
 async function load(){
-  const [p, i] = await Promise.all([
+  const [p, i, rv] = await Promise.all([
     sb.from("people").select("*"),
-    sb.from("items").select("*").order("created_at", { ascending:false })
+    sb.from("items").select("*").order("created_at", { ascending:false }),
+    sb.from("reservations").select("*")
   ]);
   if(p.error || i.error) throw (p.error || i.error);
   S.people = p.data; S.items = i.data;
+  S.res = {}; (rv.data || []).forEach(r => S.res[r.item_id] = r);
   if(S.me && !personById(S.me)){ S.me = null; lsSet(ME_KEY, null); }
   S.loaded = true;
   renderAll();
@@ -451,6 +465,7 @@ const scheduleReload = () => { clearTimeout(reloadT); reloadT = setTimeout(() =>
   sb.channel("all")
     .on("postgres_changes", { event:"*", schema:"public", table:"items" }, scheduleReload)
     .on("postgres_changes", { event:"*", schema:"public", table:"people" }, scheduleReload)
+    .on("postgres_changes", { event:"*", schema:"public", table:"reservations" }, scheduleReload)
     .subscribe();
   document.addEventListener("visibilitychange", () => { if(!document.hidden) scheduleReload(); });
   if(!S.me) setTimeout(openWelcome, 500);
@@ -553,9 +568,13 @@ function renderList(){
   const open = mine.filter(i=>!i.done), done = mine.filter(i=>i.done);
   const counts = {}; open.forEach(i => { const c=i.category||"Other"; counts[c]=(counts[c]||0)+1; });
   const cats = Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
-  if(S.cat!=="All" && S.cat!=="Completed" && !counts[S.cat]) S.cat="All";
-  const chips = [["All",open.length], ...cats.map(c=>[c,counts[c]]), ["Completed",done.length]];
-  const list = S.cat==="Completed" ? done : open.filter(i => S.cat==="All" || (i.category||"Other")===S.cat);
+  if(S.cat!=="All" && S.cat!=="Completed" && S.cat!=="Available" && !counts[S.cat]) S.cat="All";
+  // reservations are only ever shown to friends, never to the wishlist owner
+  const seeGifts = !!S.me && !isMine(pid), resOf = it => seeGifts ? S.res[it.id] : null;
+  const free = open.filter(i => !resOf(i));
+  if(S.cat === "Available" && !seeGifts) S.cat = "All";
+  const chips = [["All",open.length], ...(seeGifts && free.length !== open.length ? [["Available", free.length]] : []), ...cats.map(c=>[c,counts[c]]), ["Completed",done.length]];
+  const list = S.cat==="Completed" ? done : S.cat==="Available" ? free : open.filter(i => S.cat==="All" || (i.category||"Other")===S.cat);
   const own = isMine(pid);
   $("l-head").innerHTML = `
     <div class="l-top">
@@ -566,9 +585,9 @@ function renderList(){
     <nav class="chips">${chips.map(([c,n]) => `<button class="chip ${S.cat===c?'on':''}" data-cat="${esc(c)}">${esc(c)}<span class="n">${n}</span></button>`).join("")}</nav>`;
   // themed islands stacked top to bottom; inside each, a masonry-ish scatter with its own sizes, tilts and "weight"
   const COLW = 230, byTheme = {};
-  list.forEach(it => { const k = themeOf(it.theme) ? it.theme : ""; (byTheme[k] = byTheme[k] || []).push(it); });
-  const order = [...THEMES.map(t => t.k), ""].filter(k => byTheme[k]);
-  const islands = order.some(Boolean);
+  if(list.length) byTheme[""] = list;
+  const order = list.length ? [""] : [];
+  const islands = false;
   let yCur = islands ? 30 : 0, maxX = 0, maxY = 0, k = 0, html = "";
   S.islands = {};
   for(const key of order){
@@ -585,8 +604,10 @@ function renderList(){
       maxX = Math.max(maxX, x + w); bottom = Math.max(bottom, y + h + 90);
       const it_t = themeOf(it.theme);
       const img = it.image_url ? `<img src="${esc(it.image_url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : esc((it.name||"?")[0].toUpperCase());
-      cards += `<button class="card ${it.done?'done':''}" data-id="${esc(it.id)}" style="left:${x}px;top:${y}px;width:${w}px;--d:${(.5 + r()*1).toFixed(2)};--r:${((r()-.5)*6).toFixed(2)};animation-delay:${120 + Math.min(k++,14)*45}ms">
+      const rv = resOf(it), rvMine = rv && rv.person_id === S.me;
+      cards += `<button class="card ${it.done?'done':''} ${rv && !rvMine ? 'taken' : ''}" data-id="${esc(it.id)}" style="left:${x}px;top:${y}px;width:${w}px;--d:${(.5 + r()*1).toFixed(2)};--r:${((r()-.5)*6).toFixed(2)};animation-delay:${120 + Math.min(k++,14)*45}ms">
       ${it_t ? `<span class="stk" title="${esc(it_t.n)}">${it_t.e}</span>` : ``}
+      ${rv ? `<span class="rsv ${rvMine ? 'mine' : ''}">${rv.status === "bought" ? "✓" : "🎁"} ${esc(rvMine ? "you" : displayName(rv.person_id))}</span>` : ``}
       <div class="cimg ${it.image_url ? (isCutout(it.image_url) ? 'cutout' : '') : 'empty'}" style="height:${h}px">${img}</div>
       <i class="string"></i>
       <div class="tag"><b>${esc(it.name)}</b>${it.brand || it.price ? `<span>${esc([it.brand, it.price].filter(Boolean).join(" · "))}</span>` : ``}</div>
@@ -660,20 +681,21 @@ function openDetail(id, refresh){
     ${it.price ? `<div class="d-price">${esc(it.price)}</div>` : ``}
     ${it.description ? `<p class="d-desc">${esc(it.description)}</p>` : ``}
     ${url ? `<a class="d-link" href="${esc(url)}" target="_blank" rel="noopener">Open link ↗</a>` : ``}
-    ${S.me ? `<div class="row">
+    ${own ? `<div class="row">
       <button class="btn" id="d-done">${it.done ? "Move back" : "Mark completed"}</button>
-      ${own ? `<button class="btn" id="d-edit">Edit</button>` : ``}
+      <button class="btn" id="d-edit">Edit</button>
     </div>` : ``}
+    ${S.me && !own && !it.done ? giftBlock(it) : ``}
     ${own ? `<div class="row"><button class="btn danger" id="d-del">Delete</button></div>` : ``}
     <div class="d-meta">${esc(it.category||"Other")} · ${esc(own ? "your wish" : displayName(it.person_id)+"'s wish")}${when ? " · "+esc(when) : ""}</div>`;
   if(!refresh) openSheet("detail");
   if(!S.me) return;
+  if(!own){ wireGift(it); return; }
   $("d-done").onclick = async () => {
     const { error } = await sb.from("items").update({ done: !it.done }).eq("id", id);
     if(error) return toast("Couldn't save — try again");
     it.done = !it.done; toast(it.done ? "Completed ✓" : "Moved back"); closeSheets(); renderAll();
   };
-  if(!own) return;
   $("d-edit").onclick = () => { $("detail").classList.remove("on"); openForm(it); };
   const del = $("d-del");
   del.onclick = async () => {
@@ -681,6 +703,41 @@ function openDetail(id, refresh){
     const { error } = await sb.from("items").delete().eq("id", id);
     if(error) return toast("Couldn't delete — try again");
     S.items = S.items.filter(i=>i.id!==id); closeSheets(); renderAll(); toast("Deleted");
+  };
+}
+
+/* ---------- gift reservations ---------- */
+function giftBlock(it){
+  const rv = S.res[it.id], owner = esc(displayName(it.person_id));
+  if(!rv) return `<div class="gift">
+      <button class="btn gift-go" id="g-take" style="width:100%">🎁 I'll gift this</button>
+      <div class="gs">Friends will see it's taken, so nobody buys it twice. ${owner} won't see a thing.</div></div>`;
+  if(rv.person_id === S.me) return `<div class="gift">
+      <div class="gl"><div class="av">${avatarHTML(S.me)}</div>${rv.status === "bought" ? "✓ You've bought this" : "🎁 You're gifting this"}</div>
+      <div class="gs">Only friends see this — it's a secret from ${owner}.</div>
+      <div class="row"><button class="btn" id="g-bought">${rv.status === "bought" ? "Not bought yet" : "Mark as bought"}</button><button class="btn" id="g-drop">Cancel</button></div></div>`;
+  return `<div class="gift">
+      <div class="gl"><div class="av">${avatarHTML(rv.person_id)}</div>${rv.status === "bought" ? "✓ Already bought by " : "🎁 Taken by "}${esc(displayName(rv.person_id))}</div>
+      <div class="gs">Pick something else so ${owner} doesn't get two.</div></div>`;
+}
+function wireGift(it){
+  const take = $("g-take"), bought = $("g-bought"), drop = $("g-drop");
+  if(take) take.onclick = async () => {
+    take.disabled = true;
+    const { data, error } = await sb.from("reservations").insert({ item_id: it.id, person_id: S.me }).select().single();
+    if(error){ toast(error.code === "23505" ? "Someone just took it" : "Couldn't save — try again"); await load().catch(()=>{}); return; }
+    S.res[it.id] = data; toast("It's yours to gift 🎁"); renderAll();
+  };
+  if(bought) bought.onclick = async () => {
+    const st = S.res[it.id].status === "bought" ? "reserved" : "bought";
+    const { error } = await sb.from("reservations").update({ status: st }).eq("item_id", it.id).eq("person_id", S.me);
+    if(error) return toast("Couldn't save — try again");
+    S.res[it.id].status = st; toast(st === "bought" ? "Marked as bought ✓" : "Back to reserved"); renderAll();
+  };
+  if(drop) drop.onclick = async () => {
+    const { error } = await sb.from("reservations").delete().eq("item_id", it.id).eq("person_id", S.me);
+    if(error) return toast("Couldn't cancel — try again");
+    delete S.res[it.id]; toast("Reservation cancelled"); renderAll();
   };
 }
 
