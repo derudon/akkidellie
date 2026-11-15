@@ -208,6 +208,22 @@
   .pf-form{margin-top:22px;background:#fff;border-radius:20px;padding:4px 18px}
   .pf-form .field:last-child{border-bottom:0}
 
+  /* ---------- themes: islands on the board + stickers ---------- */
+  .island{position:absolute;border-radius:44px;background:var(--tc);
+    transform:translate(calc(var(--jx)*.25px),calc(var(--jy)*.25px)) rotate(calc(var(--r)*1deg + var(--jr)*.2deg));
+    animation:pop .6s cubic-bezier(.2,.9,.25,1.15) both}
+  .isl-label{position:absolute;left:22px;top:-18px;display:inline-flex;align-items:center;gap:7px;background:#fff;color:var(--ti);border-radius:999px;
+    padding:8px 14px 8px 10px;font-size:14px;font-weight:500;box-shadow:0 8px 20px rgba(0,0,0,.08);transform:rotate(-2.5deg);white-space:nowrap}
+  .isl-label .e{font-size:18px;line-height:1}
+  .isl-label .n{color:var(--mute);font-weight:400;font-size:12.5px}
+  .card .stk{position:absolute;top:-10px;right:-8px;width:32px;height:32px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;
+    font-size:16px;box-shadow:0 4px 12px rgba(0,0,0,.12);transform:rotate(12deg);z-index:1}
+  .d-theme{display:table;margin:12px auto 0;padding:6px 12px;border-radius:999px;font-size:13px;font-weight:500;background:var(--tc);color:var(--ti)}
+  .themes{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .themes button{padding:7px 11px;border-radius:999px;background:#fff;font-size:13px;color:#555;transition:background .15s,transform .15s}
+  .themes button.on{background:var(--tc);color:var(--ti);font-weight:500;box-shadow:inset 0 0 0 1.5px var(--ti)}
+  .themes button:active{transform:scale(.95)}
+
   /* ---------- background removal ---------- */
   .pick.cut{background-color:#fff;background-image:linear-gradient(45deg,#efefee 25%,transparent 25%),linear-gradient(-45deg,#efefee 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#efefee 75%),linear-gradient(-45deg,transparent 75%,#efefee 75%);background-size:18px 18px;background-position:0 0,0 9px,9px -9px,-9px 0}
   .pick.busy img{animation:breathe 1.4s ease-in-out infinite}
@@ -389,6 +405,12 @@ class Board{
     if(busy) this.loop();
   }
   setBounds(b){ this.b = b; }
+  focus(r){
+    const availW = this.vw - 30, availH = this.vh - this.top - this.bottom - 10;
+    const z = clamp(Math.min(availW / r.w, availH / Math.min(r.h, availH*1.6)), this.minZ, 1.15);
+    const x1 = (this.vw - r.w*z)/2 - r.x*z, y1 = this.top + 26 - r.y*z;
+    this.tween = { t0:performance.now(), ms:600, x0:this.x, y0:this.y, z0:this.z, x1, y1, z1:z }; this.vx = this.vy = 0; this.loop(); this.showPill();
+  }
   fit(animate){
     const b = this.b, cw = Math.max(1, b.maxX - b.minX), ch = Math.max(1, b.maxY - b.minY);
     const availW = this.vw - 36, availH = this.vh - this.top - this.bottom - 20;
@@ -404,7 +426,7 @@ class Board{
 }
 ["gesturestart","gesturechange"].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive:false }));
 const HB = new Board($("hb"), $("hw"), $("hz"), { top:80, bottom:60, fitMax:1 });
-const LB = new Board($("lb"), $("lw"), $("lz"), { top:118, bottom:90, fitMax:1, colW:470 });
+const LB = new Board($("lb"), $("lw"), $("lz"), { top:118, bottom:90, fitMax:1, colW:540 });
 
 /* ---------- data ---------- */
 async function load(){
@@ -542,27 +564,51 @@ function renderList(){
       <button class="round" id="share" aria-label="Copy link">↗</button>
     </div>
     <nav class="chips">${chips.map(([c,n]) => `<button class="chip ${S.cat===c?'on':''}" data-cat="${esc(c)}">${esc(c)}<span class="n">${n}</span></button>`).join("")}</nav>`;
-  // masonry-ish scatter: shortest column first, every card gets its own size, tilt and "weight"
-  const COLW = 230, cols = list.length <= 3 ? Math.max(1, list.length) : list.length <= 8 ? 2 : list.length <= 20 ? 3 : 4;
-  const colY = Array(cols).fill(0).map((_, c) => c % 2 ? 46 : 0);
-  let maxX = 0, maxY = 0;
-  $("lw").innerHTML = list.map((it, k) => {
-    const r = rng(it.id), c = colY.indexOf(Math.min(...colY));
-    const w = Math.round(158 + r()*44), h = Math.round(w * [1, 1.18, .86, 1.08][Math.floor(r()*4)]);
-    const x = Math.round(c*COLW + (COLW - w)/2 + (r()-.5)*30), y = Math.round(colY[c] + (r()-.5)*20);
-    colY[c] = y + h + 110 + r()*34;
-    maxX = Math.max(maxX, x + w); maxY = Math.max(maxY, y + h + 90);
-    const img = it.image_url ? `<img src="${esc(it.image_url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : esc((it.name||"?")[0].toUpperCase());
-    return `<button class="card ${it.done?'done':''}" data-id="${esc(it.id)}" style="left:${x}px;top:${y}px;width:${w}px;--d:${(.5 + r()*1).toFixed(2)};--r:${((r()-.5)*6).toFixed(2)};animation-delay:${120 + Math.min(k,14)*45}ms">
+  // themed islands stacked top to bottom; inside each, a masonry-ish scatter with its own sizes, tilts and "weight"
+  const COLW = 230, byTheme = {};
+  list.forEach(it => { const k = themeOf(it.theme) ? it.theme : ""; (byTheme[k] = byTheme[k] || []).push(it); });
+  const order = [...THEMES.map(t => t.k), ""].filter(k => byTheme[k]);
+  const islands = order.some(Boolean);
+  let yCur = islands ? 30 : 0, maxX = 0, maxY = 0, k = 0, html = "";
+  S.islands = {};
+  for(const key of order){
+    const items = byTheme[key], t = themeOf(key);
+    const cols = islands ? (items.length === 1 ? 1 : 2) : (items.length <= 3 ? Math.max(1, items.length) : items.length <= 8 ? 2 : items.length <= 20 ? 3 : 4);
+    const ox = islands ? Math.round((2*COLW - cols*COLW)/2) : 0, top = yCur + (islands ? 48 : 0);
+    const colY = Array(cols).fill(0).map((_, c) => c % 2 ? 46 : 0);
+    let bottom = top, cards = "";
+    for(const it of items){
+      const r = rng(it.id), c = colY.indexOf(Math.min(...colY));
+      const w = Math.round(158 + r()*44), h = Math.round(w * [1, 1.18, .86, 1.08][Math.floor(r()*4)]);
+      const x = Math.round(ox + c*COLW + (COLW - w)/2 + (r()-.5)*30), y = Math.round(top + colY[c] + (r()-.5)*20);
+      colY[c] = y - top + h + 110 + r()*34;
+      maxX = Math.max(maxX, x + w); bottom = Math.max(bottom, y + h + 90);
+      const it_t = themeOf(it.theme);
+      const img = it.image_url ? `<img src="${esc(it.image_url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : esc((it.name||"?")[0].toUpperCase());
+      cards += `<button class="card ${it.done?'done':''}" data-id="${esc(it.id)}" style="left:${x}px;top:${y}px;width:${w}px;--d:${(.5 + r()*1).toFixed(2)};--r:${((r()-.5)*6).toFixed(2)};animation-delay:${120 + Math.min(k++,14)*45}ms">
+      ${it_t ? `<span class="stk" title="${esc(it_t.n)}">${it_t.e}</span>` : ``}
       <div class="cimg ${it.image_url ? (isCutout(it.image_url) ? 'cutout' : '') : 'empty'}" style="height:${h}px">${img}</div>
       <i class="string"></i>
       <div class="tag"><b>${esc(it.name)}</b>${it.brand || it.price ? `<span>${esc([it.brand, it.price].filter(Boolean).join(" · "))}</span>` : ``}</div>
     </button>`;
-  }).join("");
+    }
+    if(islands){
+      const box = { x: ox - 26, y: yCur, w: cols*COLW + 52, h: bottom - yCur + 6 };
+      S.islands[key || "_"] = box;
+      const label = t ? `<span class="e">${t.e}</span>${esc(t.n)}` : `<span class="e">🫧</span>Anything`;
+      html += `<div class="island" style="left:${box.x}px;top:${box.y}px;width:${box.w}px;height:${box.h}px;${t ? themeVars(t) : "--tc:#ecebe8;--ti:#555"};--r:${(rng(key).call()-.5).toFixed(2)}">
+        <button class="isl-label" data-island="${esc(key || "_")}">${label}<span class="n">${items.length}</span></button></div>`;
+      maxX = Math.max(maxX, box.x + box.w);
+    }
+    html += cards;
+    yCur = bottom + (islands ? 70 : 0);
+  }
+  maxY = Math.max(maxY, yCur);
+  $("lw").innerHTML = html;
   $("lmsg").innerHTML = list.length ? "" : (S.cat==="Completed"
       ? `<div class="empty-state"><b>Nothing completed yet</b>Wishes marked as done land here.</div>`
       : `<div class="empty-state"><b>${own ? "Your wishlist is empty" : "Nothing here yet"}</b>${own ? "Tap + to add the first thing." : ""}</div>`);
-  LB.setBounds({ minX:-10, minY:-10, maxX:Math.max(maxX, 200) + 10, maxY:Math.max(maxY, 200) + 10 });
+  LB.setBounds({ minX: islands ? -40 : -10, minY:-10, maxX:Math.max(maxX, 200) + (islands ? 30 : 10), maxY:Math.max(maxY, 200) + 10 });
   const key = pid + "|" + S.cat + "|" + list.length;
   if(S.listKey !== key){ S.listKey = key; LB.fit(false); }
   $("back").onclick = climbOut;
@@ -584,6 +630,7 @@ document.addEventListener("click", e => {
   const h = e.target.closest("[data-hop]"); if(h){ hopTo(h.dataset.hop, h.querySelector(".av")); return; }
   if(e.target.closest("[data-home]")){ climbOut(); return; }
   const c = e.target.closest("[data-cat]"); if(c){ S.cat = c.dataset.cat; renderList(); return; }
+  const isl = e.target.closest("[data-island]"); if(isl){ const r = S.islands?.[isl.dataset.island]; if(r) LB.focus(r); return; }
   const it = e.target.closest(".card[data-id]"); if(it){ openDetail(it.dataset.id); }
 });
 // deep link: …/#<person id> opens that wishlist
@@ -608,6 +655,7 @@ function openDetail(id, refresh){
     <div class="grab"></div>
     ${it.image_url ? `<div class="d-img"><img src="${esc(it.image_url)}" alt="" referrerpolicy="no-referrer" class="${isCutout(it.image_url) ? 'cutout' : ''}"></div>` : `<div style="height:20px"></div>`}
     <div class="d-name">${esc(it.name)}</div>
+    ${themeOf(it.theme) ? `<div class="d-theme" style="${themeVars(themeOf(it.theme))}">${themeOf(it.theme).e} ${esc(themeOf(it.theme).n)}</div>` : ``}
     ${it.brand ? `<div class="d-brand">${esc(it.brand)}</div>` : ``}
     ${it.price ? `<div class="d-price">${esc(it.price)}</div>` : ``}
     ${it.description ? `<p class="d-desc">${esc(it.description)}</p>` : ``}
@@ -635,6 +683,18 @@ function openDetail(id, refresh){
     S.items = S.items.filter(i=>i.id!==id); closeSheets(); renderAll(); toast("Deleted");
   };
 }
+
+/* ---------- themes (the occasion a wish is for) ---------- */
+const THEMES = [
+  { k:"newyear",  e:"🎄", n:"New Year",      c:"#e5f2e7", ink:"#2c6a3a" },
+  { k:"birthday", e:"🎂", n:"Birthday",      c:"#fde8ef", ink:"#a1345c" },
+  { k:"smile",    e:"💌", n:"Make me smile", c:"#fff0e1", ink:"#a1561a" },
+  { k:"safe",     e:"🎯", n:"Safe bet",      c:"#e8eefc", ink:"#33509e" },
+  { k:"dream",    e:"✨", n:"Big dream",     c:"#f1eafb", ink:"#6b3fa8" },
+  { k:"little",   e:"🌱", n:"Little joys",   c:"#f2f5da", ink:"#5a6810" },
+];
+const themeOf = k => THEMES.find(t => t.k === k) || null;
+const themeVars = t => t ? `--tc:${t.c};--ti:${t.ink}` : "";
 
 /* ---------- background removal (runs on the phone, model is cached after the first use) ---------- */
 const isCutout = u => !!u && /\/storage\/v1\/object\/public\/images\/[^?]+\.png(\?|$)/i.test(u);
@@ -877,9 +937,17 @@ function openForm(it){
     <div class="field" style="border:0"><span>Category</span>
       <div class="cats" id="f-cats">${cats.map(c=>`<button type="button" data-c="${esc(c)}" class="${c===cur?'on':''}">${esc(c)}</button>`).join("")}<button type="button" data-c="__new">+ new</button></div>
     </div>
+    <div class="field" style="border:0;padding-top:4px"><span>Theme</span>
+      <div class="themes" id="f-themes">${THEMES.map(t => `<button type="button" data-t="${t.k}" class="${it?.theme===t.k?'on':''}" style="${themeVars(t)}">${t.e} ${esc(t.n)}</button>`).join("")}</div>
+    </div>
     <div class="err" id="f-err"></div>
     <div class="row"><button class="btn" id="f-cancel">Cancel</button><button class="btn dark" id="f-save">${it ? "Save" : "Add to list"}</button></div>`;
-  const form = { category: cur };
+  const form = { category: cur, theme: it?.theme || null };
+  $("f-themes").onclick = e => {
+    const b = e.target.closest("button[data-t]"); if(!b) return;
+    form.theme = form.theme === b.dataset.t ? null : b.dataset.t;
+    $("f-themes").querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.t === form.theme));
+  };
   form.setCat = c => {
     if(!c) return;
     let b = [...$("f-cats").querySelectorAll("button[data-c]")].find(x => x.dataset.c.toLowerCase() === c.toLowerCase());
@@ -902,7 +970,7 @@ function openForm(it){
   if(isCutout(it?.image_url)) $("pick").classList.add("cut");
   refreshBgBtn(); if(S.draft?.remote && isCutout(S.draft.remote)) $("f-bg").hidden = true;
   $("f-cancel").onclick = () => { autoCtl?.abort(); closeSheets(); };
-  $("f-save").onclick = () => save(form.category);
+  $("f-save").onclick = () => save(form.category, form.theme);
 
   const linkEl = $("f-link"), autoBtn = $("f-auto");
   const refreshBtn = () => { autoBtn.hidden = !extractUrl(linkEl.value); };
@@ -973,7 +1041,7 @@ async function autofill(form){
 }
 
 let saving=false;
-async function save(category){
+async function save(category, theme){
   if(saving) return;
   const name = $("f-name").value.trim();
   if(!name){ $("f-err").textContent="Give it a name"; $("f-name").focus(); return; }
@@ -983,7 +1051,7 @@ async function save(category){
     if(S.draft?.blob) image_url = await uploadImage(S.draft.blob);
     const body = { name, brand:$("f-brand").value.trim(), price:$("f-price").value.trim(),
                    link:(extractUrl($("f-link").value)||$("f-link").value.trim()), description:$("f-desc").value.trim(),
-                   category: category||"Other", image_url };
+                   category: category||"Other", theme: theme || null, image_url };
     if(S.editing){
       const { error } = await sb.from("items").update(body).eq("id", S.editing.id); if(error) throw error;
       Object.assign(S.items.find(i=>i.id===S.editing.id) || {}, body); toast("Saved");
