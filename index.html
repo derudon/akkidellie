@@ -7,8 +7,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="akkidellie">
-<title>akkidellie</title>
+<meta name="apple-mobile-web-app-title" content="magic wish">
+<title>magic wish</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-512.png">
@@ -32,9 +32,9 @@
   /* ---------- home ---------- */
   #home{position:fixed;inset:0;display:flex;flex-direction:column;transition:transform .7s var(--ease),opacity .55s var(--ease),filter .6s var(--ease);will-change:transform}
   #home.away{opacity:0;filter:blur(6px)}
-  .h-top{padding:calc(env(safe-area-inset-top) + 22px) 22px 0;display:flex;justify-content:space-between;align-items:baseline}
+  .h-top{padding:calc(env(safe-area-inset-top) + 18px) 18px 0 22px;display:flex;justify-content:space-between;align-items:center}
   .logo{font-weight:500;font-size:19px;letter-spacing:-.01em}
-  .h-sub{font-size:13px;color:var(--mute)}
+  .h-sub{font-size:12.5px;color:var(--mute);margin-top:2px;min-height:1em}
   .orbit{flex:1;display:flex;flex-wrap:wrap;align-content:center;justify-content:center;gap:34px 30px;padding:20px 26px 60px}
   .person{display:flex;flex-direction:column;align-items:center;gap:12px;animation:bob 6s ease-in-out infinite}
   .person:nth-child(2n){animation-delay:-3s;margin-top:70px}
@@ -148,12 +148,39 @@
   .pick-person .av{width:56px;height:56px;font-size:17px}
   .person.setup .av{background:#fff;color:var(--soft);font-size:30px;font-weight:300;border:1.5px dashed #d6d6d6;box-shadow:none}
   .btn:disabled{opacity:.6}
+
+  /* ---------- my avatar button + profile screen ---------- */
+  .me-btn{width:40px;height:40px;border-radius:50%;padding:0;flex:none;box-shadow:0 2px 10px rgba(0,0,0,.08);transition:transform .2s var(--ease)}
+  .me-btn:active{transform:scale(.92)}
+  .me-btn .av{width:40px;height:40px;font-size:14px;border:2px solid #fff}
+  .me-btn.join{width:auto;height:36px;padding:0 14px;border-radius:999px;background:var(--ink);color:#fff;font-size:13px;font-weight:500;box-shadow:none}
+  #profile{position:fixed;inset:0;background:var(--bg);z-index:8;overflow-y:auto;transform:translateX(102%);transition:transform .5s var(--ease);box-shadow:-20px 0 40px rgba(0,0,0,.06)}
+  #profile.on{transform:none}
+  #home.pushed{transform:translateX(-22%) !important;opacity:.6}
+  .pf{max-width:520px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 16px) 22px calc(env(safe-area-inset-bottom) + 40px)}
+  .pf-top{display:grid;grid-template-columns:36px 1fr 36px;align-items:center}
+  .pf-top .t{text-align:center;font-weight:500;font-size:16px}
+  .pf-av{width:148px;height:148px;margin:34px auto 0;font-size:44px;box-shadow:0 18px 40px rgba(0,0,0,.10)}
+  .pf-av.edit{cursor:pointer}
+  .pf-av .cam{position:absolute;inset:auto 0 0 0;height:38%;background:rgba(0,0,0,.42);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;letter-spacing:.02em}
+  .pf-name{text-align:center;font-size:25px;font-weight:500;letter-spacing:-.015em;margin-top:20px}
+  .pf-since{text-align:center;color:var(--mute);font-size:13px;margin-top:5px}
+  .pf-stats{display:grid;grid-template-columns:repeat(3,1fr);margin:30px 0 26px;background:#fff;border-radius:20px;padding:16px 6px}
+  .pf-stats div{text-align:center}
+  .pf-stats b{display:block;font-size:20px;font-weight:500;font-variant-numeric:tabular-nums}
+  .pf-stats span{font-size:12px;color:var(--mute)}
+  .pf-stats div+div{border-left:1px solid var(--line)}
+  .pf .btn{display:block;width:100%;padding:15px}
+  .pf .row .btn{width:auto}
+  .pf-link{display:block;width:100%;text-align:center;color:var(--mute);font-size:13px;margin-top:26px;padding:8px}
+  .pf-form{margin-top:22px;background:#fff;border-radius:20px;padding:4px 18px}
+  .pf-form .field:last-child{border-bottom:0}
 </style>
 </head>
 <body>
 
 <section id="home">
-  <div class="h-top"><div class="logo">akkidellie</div><div class="h-sub" id="h-sub"></div></div>
+  <div class="h-top"><div><div class="logo">magic wish</div><div class="h-sub" id="h-sub"></div></div><button class="me-btn" id="me-btn" aria-label="Your profile"></button></div>
   <div class="orbit" id="orbit"><div class="empty-state">Loading…</div></div>
   <div class="h-foot">tap a circle to fall into a wishlist</div>
 </section>
@@ -164,6 +191,8 @@
   <div class="pill" id="pill"></div>
   <button class="add" id="add" hidden aria-label="Add a wish">+</button>
 </div>
+
+<section id="profile" aria-label="Profile"><div class="pf" id="pf"></div></section>
 
 <div class="scrim" id="scrim"></div>
 <section class="sheet" id="detail"></section>
@@ -241,17 +270,21 @@ function renderAll(){
 function renderHome(){
   const ppl = personList();
   const open = S.items.filter(i=>!i.done).length;
-  $("h-sub").textContent = open ? `${open} wishes` : "";
+  $("h-sub").textContent = open ? `${open} ${open===1?"wish":"wishes"}` : "";
   let html = ppl.map(id => {
     const n = S.items.filter(i=>i.person_id===id && !i.done).length;
     return `<button class="person" data-person="${esc(id)}">
-      <div class="av">${avatarHTML(id)}${isMine(id) ? `<span class="edit-me" data-editme="1">✎</span>` : ``}</div>
+      <div class="av">${avatarHTML(id)}</div>
       <div class="pn">${esc(displayName(id))}${isMine(id) ? " (you)" : ""}</div>
       <div class="pc">${n ? n + (n===1?" wish":" wishes") : "no wishes yet"}</div>
     </button>`;
   }).join("");
   if(!S.me) html += `<button class="person setup" data-join="1"><div class="av">+</div><div class="pn">Join</div><div class="pc">add your circle</div></button>`;
   $("orbit").innerHTML = html || `<div class="empty-state"><b>No one here yet</b></div>`;
+  const mb = $("me-btn");
+  if(S.me && personById(S.me)){ mb.className = "me-btn"; mb.innerHTML = `<div class="av">${avatarHTML(S.me)}</div>`; }
+  else { mb.className = "me-btn join"; mb.textContent = "Join"; }
+  if($("profile").classList.contains("on") && !S.pfEditing) renderProfile();
 }
 
 /* ---------- the fall ---------- */
@@ -334,7 +367,7 @@ function renderList(){
   $("back").onclick = climbOut;
   $("share").onclick = async () => {
     const url = location.origin + location.pathname + "#" + pid;
-    try{ if(navigator.share) await navigator.share({ title: "akkidellie", url }); else { await navigator.clipboard.writeText(url); toast("Link copied"); } }catch(e){}
+    try{ if(navigator.share) await navigator.share({ title: "magic wish", url }); else { await navigator.clipboard.writeText(url); toast("Link copied"); } }catch(e){}
   };
   $("add").hidden = !own;
 }
@@ -345,7 +378,6 @@ function renderDock(){
 
 /* ---------- clicks ---------- */
 document.addEventListener("click", e => {
-  if(e.target.closest("[data-editme]")){ e.stopPropagation(); openProfile(); return; }
   if(e.target.closest("[data-join]")){ openWelcome(); return; }
   const p = e.target.closest(".person[data-person]"); if(p){ fallInto(p.dataset.person, p.querySelector(".av")); return; }
   const h = e.target.closest("[data-hop]"); if(h){ hopTo(h.dataset.hop, h.querySelector(".av")); return; }
@@ -356,6 +388,7 @@ document.addEventListener("click", e => {
 // deep link: …/#<person id> opens that wishlist
 window.addEventListener("load", () => setTimeout(() => {
   const id = location.hash.slice(1);
+  if(id === "profile"){ history.replaceState(null, "", location.pathname); return; }
   if(id && personById(id)) fallInto(id, document.querySelector(`.person[data-person="${CSS.escape(id)}"] .av`));
 }, 900));
 
@@ -413,7 +446,7 @@ async function useImageFile(f, square){
     const blob = await shrink(f, square ? 400 : 1000, square);
     const preview = URL.createObjectURL(blob);
     S.draft = { blob, preview };
-    const el = $(square ? "pick-av" : "pick"); if(el) el.innerHTML = `<img src="${preview}" alt="">`;
+    const el = $(square ? "pick-av" : "pick"); if(el) el.innerHTML = `<img src="${preview}" alt="">` + (el.classList.contains("pf-av") ? `<span class="cam">Change photo</span>` : ``);
   }catch(err){ const er=$("f-err"); if(er) er.textContent = "Couldn't read that image"; }
 }
 function shrink(file, max, square){
@@ -437,7 +470,7 @@ async function uploadImage(blob){
   return sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
 }
 document.addEventListener("paste", async e => {
-  if(!$("form").classList.contains("on")) return;
+  if(!$("form").classList.contains("on") && !S.pfEditing) return;
   const f = [...(e.clipboardData?.files || [])].find(x => x.type.startsWith("image/"));
   if(!f) return;
   e.preventDefault();
@@ -449,7 +482,7 @@ function openWelcome(){
   const others = personList();
   $("form").innerHTML = `
     <div class="grab"></div>
-    <div class="f-title">Welcome to akkidellie</div>
+    <div class="f-title">Welcome to magic wish</div>
     ${others.length ? `<p class="d-meta" style="margin:0 0 10px">Already have a circle? Tap it.</p>
       <div class="pick-row">${others.map(id => `<button class="pick-person" data-pick="${esc(id)}"><div class="av">${avatarHTML(id)}</div><span>${esc(displayName(id))}</span></button>`).join("")}</div>
       <p class="d-meta" style="margin:18px 0 0">or make a new one</p>` : ``}
@@ -464,22 +497,65 @@ function openWelcome(){
   $("p-save").onclick = () => saveProfile(true);
   openSheet("form");
 }
+/* ---------- profile screen ---------- */
+$("me-btn").onclick = () => S.me && personById(S.me) ? openProfile() : openWelcome();
 function openProfile(){
-  const p = personById(S.me); if(!p) return openWelcome();
-  S.draft = null;
-  $("form").innerHTML = `
-    <div class="grab"></div>
-    <div class="f-title">Your circle</div>
-    <button class="av pick-av" id="pick-av" type="button">${p.avatar_url ? `<img src="${esc(p.avatar_url)}" alt="">` : "Add photo"}</button>
-    <label class="field"><span>Name</span><input id="p-name" maxlength="30" value="${esc(p.name)}"></label>
-    <div class="err" id="f-err"></div>
-    <div class="row"><button class="btn" id="p-cancel">Cancel</button><button class="btn dark" id="p-save">Save</button></div>
-    <div class="row"><button class="btn" id="p-out" style="background:transparent;color:var(--mute);font-weight:400">This isn't me — switch circle</button></div>`;
-  $("pick-av").onclick = () => { pickTarget="avatar"; $("file").click(); };
-  $("p-cancel").onclick = closeSheets;
-  $("p-out").onclick = () => { S.me = null; lsSet(ME_KEY, null); closeSheets(); renderAll(); setTimeout(openWelcome, 350); };
-  $("p-save").onclick = () => saveProfile(false);
-  openSheet("form");
+  if(!personById(S.me)) return openWelcome();
+  S.pfEditing = false; renderProfile();
+  $("pf").parentElement.scrollTop = 0;
+  $("profile").classList.add("on"); $("home").classList.add("pushed");
+  if(location.hash !== "#profile") history.pushState({ profile:true }, "", "#profile");
+}
+function closeProfile(fromPop){
+  if(!$("profile").classList.contains("on")) return;
+  $("profile").classList.remove("on"); $("home").classList.remove("pushed");
+  S.pfEditing = false;
+  if(!fromPop && location.hash === "#profile") history.back();
+}
+window.addEventListener("popstate", () => { if(location.hash !== "#profile") closeProfile(true); });
+
+function renderProfile(){
+  const p = personById(S.me); if(!p) return;
+  const mine = S.items.filter(i => i.person_id === S.me);
+  const done = mine.filter(i => i.done).length, open = mine.length - done;
+  const cats = new Set(mine.filter(i=>!i.done).map(i => i.category || "Other")).size;
+  const since = p.created_at ? new Date(p.created_at).toLocaleDateString(undefined, { month:"long", year:"numeric" }) : "";
+  if(!S.pfEditing){
+    $("pf").innerHTML = `
+      <div class="pf-top"><button class="round" id="pf-back" aria-label="Back">‹</button><div class="t">Profile</div><span></span></div>
+      <div class="av pf-av">${avatarHTML(S.me)}</div>
+      <div class="pf-name">${esc(p.name)}</div>
+      ${since ? `<div class="pf-since">with magic wish since ${esc(since)}</div>` : ``}
+      <div class="pf-stats">
+        <div><b>${open}</b><span>wishes</span></div>
+        <div><b>${done}</b><span>completed</span></div>
+        <div><b>${cats}</b><span>categories</span></div>
+      </div>
+      <button class="btn dark" id="pf-edit">Edit profile</button>
+      <div class="row"><button class="btn" id="pf-list">My wishlist</button><button class="btn" id="pf-share">Share my list</button></div>
+      <button class="pf-link" id="pf-out">This isn't me — switch circle</button>`;
+    $("pf-back").onclick = () => closeProfile();
+    $("pf-edit").onclick = () => { S.pfEditing = true; S.draft = null; renderProfile(); };
+    $("pf-list").onclick = () => { closeProfile(); setTimeout(() => fallInto(S.me, document.querySelector(`.person[data-person="${CSS.escape(S.me)}"] .av`)), 420); };
+    $("pf-share").onclick = async () => {
+      const url = location.origin + location.pathname + "#" + S.me;
+      try{ if(navigator.share) await navigator.share({ title:"magic wish", url }); else { await navigator.clipboard.writeText(url); toast("Link copied"); } }catch(e){}
+    };
+    $("pf-out").onclick = () => { S.me = null; lsSet(ME_KEY, null); closeProfile(); renderAll(); setTimeout(openWelcome, 450); };
+  } else {
+    $("pf").innerHTML = `
+      <div class="pf-top"><button class="round" id="pf-x" aria-label="Cancel">✕</button><div class="t">Edit profile</div><span></span></div>
+      <button class="av pf-av edit" id="pick-av" type="button">${S.draft?.preview ? `<img src="${S.draft.preview}" alt="">` : avatarHTML(S.me)}<span class="cam">Change photo</span></button>
+      <div class="pf-form">
+        <label class="field"><span>Name</span><input id="p-name" maxlength="30" value="${esc(p.name)}"></label>
+      </div>
+      <div class="err" id="f-err"></div>
+      <div class="row"><button class="btn" id="pf-cancel">Cancel</button><button class="btn dark" id="p-save">Save</button></div>`;
+    const cancel = () => { S.pfEditing = false; S.draft = null; renderProfile(); };
+    $("pf-x").onclick = cancel; $("pf-cancel").onclick = cancel;
+    $("pick-av").onclick = () => { pickTarget = "avatar"; $("file").click(); };
+    $("p-save").onclick = () => saveProfile(false);
+  }
 }
 async function saveProfile(isNew){
   const name = $("p-name").value.trim();
@@ -497,7 +573,8 @@ async function saveProfile(isNew){
       if(error) throw error;
       Object.assign(personById(S.me), { name, avatar_url });
     }
-    closeSheets(); renderAll(); toast(isNew ? "Your circle is ready" : "Saved");
+    if(isNew) closeSheets(); else { S.pfEditing = false; S.draft = null; }
+    renderAll(); if(!isNew) renderProfile(); toast(isNew ? "Your circle is ready" : "Profile updated");
   }catch(e){ $("f-err").textContent = "Couldn't save — try again"; btn.textContent = isNew ? "Create my circle" : "Save"; btn.disabled = false; }
 }
 
