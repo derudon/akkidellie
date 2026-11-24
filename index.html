@@ -70,7 +70,10 @@
   #lb{transition:transform .75s var(--ease),opacity .5s ease;transform-origin:50% 40%}
   #list:not(.shown) .l-head{opacity:0;transform:translateY(-10px)}
   #list:not(.shown) #lb{transform:scale(.82);opacity:0}
-  .l-top{display:grid;grid-template-columns:36px 1fr 36px;align-items:center;margin-bottom:16px}
+  .l-top{display:grid;grid-template-columns:36px 1fr auto;align-items:center;margin-bottom:16px}
+  .l-acts{display:flex;align-items:center;gap:8px}
+  .l-acts .me-btn{width:36px;height:36px}
+  .l-acts .me-btn .av{width:36px;height:36px;font-size:13px}
   .round{width:36px;height:36px;border-radius:50%;background:var(--card);display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.06)}
   .l-title{text-align:center;font-weight:500;font-size:16px}
 
@@ -117,6 +120,8 @@
   @media(min-width:640px){.sheet{max-width:460px;margin:0 auto}}
   .sheet.on{transform:none}
   .grab{width:36px;height:4px;border-radius:4px;background:var(--soft);margin:0 auto 14px}
+  .x-close{position:sticky;top:0;z-index:3;display:flex;align-items:center;justify-content:center;width:34px;height:34px;margin:-6px -8px -28px auto;border-radius:50%;background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:var(--ink2);font-size:14px;box-shadow:0 1px 6px var(--shade)}
+  .x-close:active{transform:scale(.92)}
   .d-img{aspect-ratio:1.2;display:flex;align-items:center;justify-content:center;background:var(--paper);border-radius:22px;overflow:hidden}
   .d-img:has(img.cutout){background:transparent;overflow:visible}
   .d-img img{max-width:72%;max-height:88%;object-fit:contain;mix-blend-mode:multiply}
@@ -178,7 +183,7 @@
   @keyframes pop{from{opacity:0;scale:.82}}
   .card .cimg{background:var(--paper);border-radius:22px;box-shadow:0 12px 30px rgba(0,0,0,.08);display:flex;align-items:center;justify-content:center;overflow:hidden;transition:scale .2s var(--ease)}
   .card:active .cimg{scale:.97}
-  .card .cimg img{max-width:84%;max-height:84%;object-fit:contain;mix-blend-mode:multiply}
+  .card .cimg img{width:100%;height:100%;object-fit:cover;display:block}
   .card .cimg.empty{color:var(--soft);font-size:34px;font-weight:300}
   .card .string{display:block;width:1.5px;height:16px;margin:0 0 0 24px;background:var(--soft);transform-origin:top;
     transform:rotate(calc(var(--jx)*-2deg))}
@@ -187,6 +192,7 @@
   .card .tag b{font-weight:500;font-size:13px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
   .card .tag span{font-size:11.5px;color:var(--mute);margin-top:2px}
   .card.done{opacity:.4}
+  .world.quiet .card{animation:none}
   .card.done .tag b{text-decoration:line-through;text-decoration-thickness:1px}
   .person.card{display:flex;flex-direction:column;align-items:center;text-align:center}
   .zoom-pill{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 42px);z-index:5;background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
@@ -643,6 +649,25 @@ async function hopTo(pid, fromEl){
 }
 
 /* ---------- list ---------- */
+// cards take the shape of their picture: same width, height from the image's own proportions
+const RATIO_KEY = "magicwish.ratios";
+let RATIOS = {}; try{ RATIOS = JSON.parse(localStorage.getItem(RATIO_KEY) || "{}"); }catch(e){}
+let ratioT = null;
+function imgRatio(url){
+  if(RATIOS[url]) return RATIOS[url];
+  if(RATIOS[url] === undefined){
+    RATIOS[url] = 0;
+    const im = new Image(); im.referrerPolicy = "no-referrer";
+    im.onload = () => {
+      RATIOS[url] = Math.min(1.7, Math.max(.6, +(im.naturalHeight / im.naturalWidth).toFixed(3))) || 1;
+      try{ localStorage.setItem(RATIO_KEY, JSON.stringify(RATIOS)); }catch(e){}
+      clearTimeout(ratioT); ratioT = setTimeout(() => { if(S.view){ S.quietList = true; renderList(); } }, 120);
+    };
+    im.onerror = () => { RATIOS[url] = 1; };
+    im.src = url;
+  }
+  return 1;
+}
 function renderList(){
   const pid = S.view; if(!pid) return;
   const mine = S.items.filter(i => i.person_id === pid);
@@ -666,7 +691,7 @@ function renderList(){
     <div class="l-top">
       <button class="round" id="back" aria-label="Back">‹</button>
       <div class="l-title">${esc(own ? "your wishlist" : displayName(pid) + "'s wishlist")}${bdaySoon(personById(pid)?.birthday) ? `<div class="bday" style="font-size:12px;font-weight:400;margin-top:2px">${bdaySoon(personById(pid)?.birthday)}</div>` : ``}</div>
-      <button class="round" id="share" aria-label="Copy link">↗</button>
+      <div class="l-acts"><button class="round" id="share" aria-label="Copy link">↗</button>${S.me && personById(S.me) ? `<button class="me-btn" data-me aria-label="Your profile"><div class="av">${avatarHTML(S.me)}</div></button>` : ``}</div>
     </div>
     <div class="fbar">
       <div class="dd" id="dd">
@@ -690,10 +715,10 @@ function renderList(){
     let bottom = top, cards = "";
     for(const it of items){
       const r = rng(it.id), c = colY.indexOf(Math.min(...colY));
-      const w = Math.round(158 + r()*44), h = Math.round(w * [1, 1.18, .86, 1.08][Math.floor(r()*4)]);
+      const w = Math.round(158 + r()*44), ar = it.image_url ? imgRatio(it.image_url) : 1, h = Math.round(w * ar);
       const x = Math.round(ox + c*COLW + (COLW - w)/2 + (r()-.5)*30), y = Math.round(top + colY[c] + (r()-.5)*20);
-      colY[c] = y - top + h + 110 + r()*34;
-      maxX = Math.max(maxX, x + w); bottom = Math.max(bottom, y + h + 90);
+      colY[c] = y - top + h + 44 + r()*30;
+      maxX = Math.max(maxX, x + w); bottom = Math.max(bottom, y + h + 30);
       const it_t = themeOf(it.theme);
       const img = it.image_url ? `<img src="${esc(it.image_url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : esc((it.name||"?")[0].toUpperCase());
       const rv = resOf(it), rvMine = rv && rv.person_id === S.me;
@@ -701,8 +726,6 @@ function renderList(){
       ${it_t ? `<span class="stk" title="${esc(it_t.n)}">${it_t.e}</span>` : ``}
       ${rv ? `<span class="rsv ${rvMine ? 'mine' : ''}">${rv.status === "bought" ? "✓" : "🎁"} ${esc(rvMine ? "you" : displayName(rv.person_id))}</span>` : ``}
       <div class="cimg ${it.image_url ? (isCutout(it.image_url) ? 'cutout' : '') : 'empty'}" style="height:${h}px">${img}</div>
-      <i class="string"></i>
-      <div class="tag"><b>${esc(it.name)}</b>${it.brand || it.price ? `<span>${esc([it.brand, it.price].filter(Boolean).join(" · "))}</span>` : ``}</div>
     </button>`;
     }
     if(islands){
@@ -717,6 +740,7 @@ function renderList(){
     yCur = bottom + (islands ? 70 : 0);
   }
   maxY = Math.max(maxY, yCur);
+  $("lw").classList.toggle("quiet", !!S.quietList); S.quietList = false;
   $("lw").innerHTML = html;
   $("lmsg").innerHTML = list.length ? "" : (S.cat==="Completed"
       ? `<div class="empty-state"><b>Nothing completed yet</b>Wishes marked as done land here.</div>`
@@ -739,6 +763,8 @@ function renderDock(){
 /* ---------- clicks ---------- */
 document.addEventListener("click", e => {
   if(e.target.closest("[data-join]")){ openWelcome(); return; }
+  if(e.target.closest("[data-me]")){ openProfile(); return; }
+  if(e.target.closest("[data-close]")){ autoCtl?.abort(); closeSheets(); return; }
   const p = e.target.closest(".person[data-person]"); if(p){ fallInto(p.dataset.person, p.querySelector(".av")); return; }
   const h = e.target.closest("[data-hop]"); if(h){ hopTo(h.dataset.hop, h.querySelector(".av")); return; }
   if(e.target.closest("[data-home]")){ climbOut(); return; }
@@ -768,7 +794,7 @@ function openDetail(id, refresh){
   const when = it.created_at ? new Date(it.created_at).toLocaleDateString(undefined,{day:"numeric",month:"short"}) : "";
   const own = isMine(it.person_id);
   $("detail").innerHTML = `
-    <div class="grab"></div>
+    <div class="grab"></div><button class="x-close" type="button" data-close aria-label="Close">✕</button>
     ${it.image_url ? `<div class="d-img"><img src="${esc(it.image_url)}" alt="" referrerpolicy="no-referrer" class="${isCutout(it.image_url) ? 'cutout' : ''}"></div>` : `<div style="height:20px"></div>`}
     <div class="d-name">${esc(it.name)}</div>
     ${themeOf(it.theme) ? `<div class="d-theme" style="${themeVars(themeOf(it.theme))}">${themeOf(it.theme).e} ${esc(themeOf(it.theme).n)}</div>` : ``}
@@ -1029,7 +1055,7 @@ document.addEventListener("paste", async e => {
 function openWelcome(){
   const others = personList();
   $("form").innerHTML = `
-    <div class="grab"></div>
+    <div class="grab"></div><button class="x-close" type="button" data-close aria-label="Close">✕</button>
     <div class="f-title">Welcome to magic wish</div>
     ${others.length ? `<p class="d-meta" style="margin:0 0 10px">Already have a circle? Tap it.</p>
       <div class="pick-row">${others.map(id => `<button class="pick-person" data-pick="${esc(id)}"><div class="av">${avatarHTML(id)}</div><span>${esc(displayName(id))}</span></button>`).join("")}</div>
@@ -1168,7 +1194,7 @@ function openForm(it){
   const cats = [...new Set([...S.items.map(i=>i.category).filter(Boolean), ...DEFAULT_CATS])];
   const cur = it?.category || "";
   $("form").innerHTML = `
-    <div class="grab"></div>
+    <div class="grab"></div><button class="x-close" type="button" data-close aria-label="Close">✕</button>
     <div class="f-title">${it ? "Edit wish" : "New wish"}</div>
     <div class="link-box">
       <input id="f-link" inputmode="url" autocomplete="off" value="${esc(it?.link)}" placeholder="Paste a link — Amazon, Ozon, any shop">
